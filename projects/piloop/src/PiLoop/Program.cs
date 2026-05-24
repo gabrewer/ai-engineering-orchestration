@@ -133,11 +133,83 @@ planCommand.SetAction(async (result, ct) =>
     }
 });
 
+var buildSprintOption = new Option<string?>("--prd")
+{
+    Description = "Sprint name or target-repo-relative sprint JSON path to build."
+};
+var buildAllOption = new Option<bool>("--all")
+{
+    Description = "Build all discovered sprint plans in order."
+};
+var buildBranchOption = new Option<string?>("--branch")
+{
+    Description = "Branch to build on. Defaults to feature/<sprint>."
+};
+var noCommitOption = new Option<bool>("--no-commit")
+{
+    Description = "Do not commit after each task."
+};
+
+var buildCommand = new Command("build", "Run the Pi-backed build loop for sprint task implementation.")
+{
+    targetRootOption,
+    buildSprintOption,
+    buildAllOption,
+    buildBranchOption,
+    noCommitOption,
+    skipGitHubOption,
+    piCommandOption,
+    piProviderOption,
+    piModelOption,
+    piThinkingOption,
+};
+
+buildCommand.SetAction(async (result, ct) =>
+{
+    try
+    {
+        var target = TargetProjectOptions.From(result.GetValue(targetRootOption));
+        StateManager.SetRepoRoot(target.Root.FullName);
+        await PiLoopTemplateInstaller.InstallAsync(target.Root);
+        var all = result.GetValue(buildAllOption);
+        var sprint = result.GetValue(buildSprintOption);
+        if (!all && string.IsNullOrWhiteSpace(sprint))
+        {
+            AnsiConsole.MarkupLine("[red]Specify --prd <sprint-name-or-json> or --all.[/]");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        var piRuntime = PiRuntimeOptions.From(
+            result.GetValue(piCommandOption),
+            result.GetValue(piProviderOption),
+            result.GetValue(piModelOption),
+            result.GetValue(piThinkingOption));
+        var loop = new BuildLoop(target.Root, piRuntime, publishGitHub: !result.GetValue(skipGitHubOption));
+
+        if (all)
+        {
+            foreach (var file in PrdReader.DiscoverAllSprintPlans())
+                await loop.ExecuteAsync(file, result.GetValue(buildBranchOption), commit: !result.GetValue(noCommitOption));
+        }
+        else
+        {
+            await loop.ExecuteAsync(sprint!, result.GetValue(buildBranchOption), commit: !result.GetValue(noCommitOption));
+        }
+    }
+    catch (Exception ex)
+    {
+        AnsiConsole.MarkupLine($"[red]{Markup.Escape(ex.Message)}[/]");
+        Environment.ExitCode = 1;
+    }
+});
+
 var rootCommand = new RootCommand("piloop — Pi-native project orchestration")
 {
     inspectCommand,
     initCommand,
     planCommand,
+    buildCommand,
 };
 
 return await rootCommand.Parse(args).InvokeAsync();

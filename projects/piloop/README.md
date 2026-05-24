@@ -48,6 +48,7 @@ PiLoop should support two onboarding paths:
 - `docs/migration-plan.md` — how Pi-native code moves out of TrakPomo into this repo
 - `docs/integration-test-piloop-test.md` — disposable GitHub-backed integration test notes
 - `docs/evidence-contract.md` — what PiLoop records to GitHub Issues for defensible work history
+- `docs/build-mode.md` — current build-mode command behavior and limitations
 
 ## Current status
 
