@@ -149,6 +149,10 @@ var noCommitOption = new Option<bool>("--no-commit")
 {
     Description = "Do not commit after each task."
 };
+var buildResumeOption = new Option<bool>("--resume")
+{
+    Description = "Resume existing .piloop state for the sprint and skip tasks already marked done."
+};
 
 var buildCommand = new Command("build", "Run the Pi-backed build loop for sprint task implementation.")
 {
@@ -157,6 +161,7 @@ var buildCommand = new Command("build", "Run the Pi-backed build loop for sprint
     buildAllOption,
     buildBranchOption,
     noCommitOption,
+    buildResumeOption,
     skipGitHubOption,
     piCommandOption,
     piProviderOption,
@@ -190,11 +195,11 @@ buildCommand.SetAction(async (result, ct) =>
         if (all)
         {
             foreach (var file in PrdReader.DiscoverAllSprintPlans())
-                await loop.ExecuteAsync(file, result.GetValue(buildBranchOption), commit: !result.GetValue(noCommitOption));
+                await loop.ExecuteAsync(file, result.GetValue(buildBranchOption), commit: !result.GetValue(noCommitOption), resume: result.GetValue(buildResumeOption));
         }
         else
         {
-            await loop.ExecuteAsync(sprint!, result.GetValue(buildBranchOption), commit: !result.GetValue(noCommitOption));
+            await loop.ExecuteAsync(sprint!, result.GetValue(buildBranchOption), commit: !result.GetValue(noCommitOption), resume: result.GetValue(buildResumeOption));
         }
     }
     catch (Exception ex)

@@ -9,6 +9,7 @@ dotnet run --project projects/piloop/src/PiLoop -- build --target-root <repo> --
 dotnet run --project projects/piloop/src/PiLoop -- build --target-root <repo> --all
 dotnet run --project projects/piloop/src/PiLoop -- build --target-root <repo> --prd <sprint> --skip-github
 dotnet run --project projects/piloop/src/PiLoop -- build --target-root <repo> --prd <sprint> --no-commit
+dotnet run --project projects/piloop/src/PiLoop -- build --target-root <repo> --prd <sprint> --resume
 ```
 
 ## Current behavior
@@ -25,6 +26,12 @@ For each task, PiLoop:
    - otherwise records validation as skipped
 6. commits task changes unless `--no-commit` is specified
 7. publishes a task evidence comment with intent, plan, work performed, decisions, blockers, test results, remaining issues, artifacts, and summary
+
+## Resume behavior
+
+`--resume` loads `.piloop/state-<sprint>.json`, keeps the previous branch and issue map unless explicitly overridden, and skips tasks already marked `done`.
+
+Tasks marked `failed`, `building`, `testing`, `destroying`, or `reviewing` are retried because they did not complete successfully.
 
 ## Current limitations
 
