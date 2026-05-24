@@ -42,6 +42,7 @@ PiLoop should support two onboarding paths:
 
 ## Initial project shape
 
+- `docs/discovery-to-piloop.md` — upstream `/inspire`/`/brainstorm` discovery into PRD, then PiLoop orchestration
 - `docs/architecture.md` — what PiLoop is and is not
 - `docs/workflow-new-project.md` — bootstrap workflow for empty/new repos
 - `docs/workflow-existing-project.md` — adoption workflow for existing repos

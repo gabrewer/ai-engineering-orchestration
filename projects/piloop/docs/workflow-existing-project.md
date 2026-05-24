@@ -4,6 +4,8 @@
 
 Adopt PiLoop inside an existing codebase without pretending the project was designed for it from day one.
 
+Before PiLoop planning starts, use Pi discovery skills such as `/inspire` and `/brainstorm` when a new initiative needs product shaping. The durable handoff into PiLoop is a PRD under `docs/`. See `docs/discovery-to-piloop.md`.
+
 ## Desired outcome
 
 An existing repo should end up with:
@@ -66,7 +68,12 @@ PiLoop should use the repo's orchestration instructions to generate or refine:
 - review prompts
 - scope-boundary prompts
 
-### Step 5 — Prove planning mode first
+### Step 5 — Create or select the PRD
+For a new initiative in an existing repo, use Pi discovery skills such as `/inspire` and `/brainstorm`, then write or refine the PRD under `docs/`.
+
+For an already-planned initiative, select the existing PRD that PiLoop should plan from.
+
+### Step 6 — Prove planning mode first
 The first successful adoption target is planning mode.
 
 Planning mode should prove:
@@ -76,7 +83,7 @@ Planning mode should prove:
 - GitHub issue creation works for this repo
 - human review can occur from GitHub and docs alone
 
-### Step 6 — Review operational friction
+### Step 7 — Review operational friction
 Before enabling build mode, evaluate:
 - transport reliability
 - test command quality
@@ -85,7 +92,7 @@ Before enabling build mode, evaluate:
 - whether issue granularity is correct
 - whether prompts are too generic or too broad
 
-### Step 7 — Enable execution mode gradually
+### Step 8 — Enable execution mode gradually
 Execution mode should be enabled in phases:
 1. planning only
 2. test-writer + builders in limited scope

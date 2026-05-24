@@ -4,6 +4,8 @@
 
 Bootstrap a brand-new software project with PiLoop from the start, so planning and execution are built around Pi-native orchestration from day one.
 
+Before PiLoop planning starts, use Pi discovery skills such as `/inspire` and `/brainstorm` to create a durable PRD under `docs/`. See `docs/discovery-to-piloop.md`.
+
 ## Desired outcome
 
 A new repo should end up with:
@@ -56,7 +58,7 @@ New project bootstrap should provide:
 These may start from PiLoop templates, then be specialized using the project's `TEAM-ORCHESTRATION.md`.
 
 ### Step 5 — Create the first PRD
-Write the first PRD under `docs/`.
+Use Pi discovery skills such as `/inspire` and `/brainstorm`, then write the first PRD under `docs/`.
 
 PiLoop does not invent the product vision by default; it expects the human or a planning workflow to establish it.
 
