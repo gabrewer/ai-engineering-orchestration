@@ -39,8 +39,24 @@ public sealed class SkillModelConfigService
         try
         {
             var json = await File.ReadAllTextAsync(path);
-            var parsed = JsonSerializer.Deserialize<Dictionary<string, SkillModelEntry>>(json, JsonOptions) ?? [];
-            return new Dictionary<string, SkillModelEntry>(parsed, StringComparer.OrdinalIgnoreCase);
+            using var document = JsonDocument.Parse(json, new JsonDocumentOptions
+            {
+                CommentHandling = JsonCommentHandling.Skip,
+                AllowTrailingCommas = true,
+            });
+
+            var result = new Dictionary<string, SkillModelEntry>(StringComparer.OrdinalIgnoreCase);
+            foreach (var property in document.RootElement.EnumerateObject())
+            {
+                if (property.Value.ValueKind != JsonValueKind.Object)
+                    continue;
+
+                var entry = property.Value.Deserialize<SkillModelEntry>(JsonOptions);
+                if (entry is not null)
+                    result[property.Name] = entry;
+            }
+
+            return result;
         }
         catch
         {

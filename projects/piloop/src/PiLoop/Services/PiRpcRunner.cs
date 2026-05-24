@@ -338,6 +338,25 @@ public sealed class PiRpcRunner
             }
         }
 
+        if (node["findings"] is JsonArray findings)
+        {
+            for (var i = 0; i < findings.Count; i++)
+            {
+                if (findings[i] is JsonValue value && value.TryGetValue<string>(out var text))
+                {
+                    findings[i] = new JsonObject
+                    {
+                        ["severity"] = "low",
+                        ["title"] = text.Length > 80 ? text[..80] : text,
+                        ["detail"] = text,
+                        ["file"] = null,
+                        ["line"] = null,
+                        ["recommendation"] = "Review this worker-reported finding."
+                    };
+                }
+            }
+        }
+
         return node.ToJsonString();
     }
 
