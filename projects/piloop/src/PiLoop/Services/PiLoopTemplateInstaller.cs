@@ -5,9 +5,12 @@ public static class PiLoopTemplateInstaller
     public static async Task InstallAsync(DirectoryInfo targetRoot, bool overwrite = false)
     {
         Directory.CreateDirectory(Path.Combine(targetRoot.FullName, ".pi", "prompts"));
+        Directory.CreateDirectory(Path.Combine(targetRoot.FullName, ".pi", "extensions"));
         Directory.CreateDirectory(Path.Combine(targetRoot.FullName, ".agents", "skills"));
         Directory.CreateDirectory(Path.Combine(targetRoot.FullName, "docs", "sprints"));
 
+        await WriteIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "skill-models.json"), SkillModelsJson, overwrite);
+        await WriteIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "extensions", "skill-model-router.ts"), SkillModelRouterExtension, overwrite);
         await WriteIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "prompts", "product-designer.md"), ProductDesignerPrompt, overwrite);
         await WriteIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "prompts", "pm.md"), PmPrompt, overwrite);
         await WriteIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "prompts", "test-writer.md"), TestWriterPrompt, overwrite);
@@ -23,6 +26,98 @@ public static class PiLoopTemplateInstaller
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         await File.WriteAllTextAsync(path, content.Trim() + Environment.NewLine);
     }
+
+    private const string SkillModelsJson = """
+{
+  "_readme": "Maps PiLoop worker names to provider + model + thinking level. The Pi extension uses this for interactive prompt/skill routing; PiLoop also reads it for RPC worker subprocesses.",
+
+  "product-designer": { "provider": "openai-codex", "model": "gpt-5.5", "thinkingLevel": "medium" },
+  "pm":               { "provider": "openai-codex", "model": "gpt-5.5", "thinkingLevel": "medium" },
+
+  "test-writer":      { "provider": "openai-codex", "model": "gpt-5.4", "thinkingLevel": "medium" },
+  "backend-builder":  { "provider": "openai-codex", "model": "gpt-5.4", "thinkingLevel": "medium" },
+  "frontend-builder": { "provider": "openai-codex", "model": "gpt-5.4", "thinkingLevel": "medium" },
+
+  "domain-modeler":   { "provider": "openai-codex", "model": "gpt-5.4", "thinkingLevel": "high" },
+  "api-developer":    { "provider": "openai-codex", "model": "gpt-5.4", "thinkingLevel": "medium" },
+  "destroyer":        { "provider": "openai-codex", "model": "gpt-5.5", "thinkingLevel": "high" },
+  "review-agent":     { "provider": "openai-codex", "model": "gpt-5.5", "thinkingLevel": "high" },
+  "git-committer":    { "provider": "openai-codex", "model": "gpt-5.4-mini", "thinkingLevel": "low" }
+}
+""";
+
+    private const string SkillModelRouterExtension = """
+/**
+ * Skill Model Router
+ *
+ * Uses .pi/skill-models.json to switch model/thinking level for interactive Pi
+ * /skill:name and /prompt-name invocations. PiLoop reads the same JSON directly
+ * for RPC worker subprocesses because RPC prompts may not trigger slash-command
+ * input routing.
+ */
+
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+
+interface SkillModelEntry {
+  provider: string;
+  model: string;
+  thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+}
+
+type SkillModelConfig = Record<string, SkillModelEntry>;
+
+export default function (pi: ExtensionAPI) {
+  let config: SkillModelConfig = {};
+
+  function loadConfig(cwd: string): void {
+    const configPath = join(cwd, ".pi", "skill-models.json");
+    if (!existsSync(configPath)) return;
+    try {
+      const parsed = JSON.parse(readFileSync(configPath, "utf-8"));
+      delete parsed._readme;
+      config = parsed;
+    } catch (err) {
+      console.error(`[skill-model-router] Failed to load skill-models.json: ${err}`);
+    }
+  }
+
+  pi.on("session_start", async (_event, ctx) => loadConfig(ctx.cwd));
+  pi.on("resources_discover", async (_event, ctx) => loadConfig(ctx.cwd));
+
+  pi.on("input", async (event, ctx) => {
+    const text = event.text.trim();
+    let invokedName: string | undefined;
+
+    if (text.startsWith("/skill:")) {
+      invokedName = text.slice("/skill:".length).split(/\s/)[0];
+    } else if (text.startsWith("/")) {
+      const candidate = text.slice(1).split(/\s/)[0];
+      if (candidate && config[candidate]) invokedName = candidate;
+    }
+
+    if (!invokedName || !config[invokedName]) return { action: "continue" };
+
+    const { provider, model, thinkingLevel } = config[invokedName];
+    const targetModel = ctx.modelRegistry.find(provider, model);
+    if (!targetModel) {
+      ctx.ui.notify(`[skill-model-router] Model ${provider}/${model} not found for "${invokedName}"`, "warning");
+      return { action: "continue" };
+    }
+
+    const switched = await pi.setModel(targetModel);
+    if (!switched) {
+      ctx.ui.notify(`[skill-model-router] No API key for ${provider}/${model}`, "warning");
+      return { action: "continue" };
+    }
+
+    if (thinkingLevel) pi.setThinkingLevel(thinkingLevel);
+    ctx.ui.notify(`${invokedName} → ${provider}/${model}${thinkingLevel ? ` (thinking: ${thinkingLevel})` : ""}`, "info");
+    return { action: "continue" };
+  });
+}
+""";
 
     private const string ProductDesignerPrompt = """
 ---

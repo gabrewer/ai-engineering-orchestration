@@ -1,6 +1,24 @@
 # PiLoop Model Selection
 
-PiLoop workers should be able to choose their own model from the prompt file.
+PiLoop supports both project-level model routing and prompt-level model selection.
+
+## Shared skill model routing
+
+`piloop init` installs:
+
+- `.pi/skill-models.json`
+- `.pi/extensions/skill-model-router.ts`
+
+The extension uses `skill-models.json` for interactive Pi slash-command routing. PiLoop reads the same `skill-models.json` directly for RPC worker subprocesses, because raw RPC prompts may not trigger slash-command extension routing.
+
+Example:
+
+```json
+{
+  "product-designer": { "provider": "openai-codex", "model": "gpt-5.5", "thinkingLevel": "medium" },
+  "backend-builder": { "provider": "openai-codex", "model": "gpt-5.4", "thinkingLevel": "medium" }
+}
+```
 
 ## Prompt-level model
 
@@ -29,8 +47,9 @@ If `--pi-model` is provided, it wins over prompt frontmatter for every worker in
 
 ## Precedence
 
-1. `--pi-model` CLI override
-2. prompt frontmatter `model:`
-3. Pi default model/provider configuration
+1. explicit CLI overrides: `--pi-provider`, `--pi-model`, `--pi-thinking`
+2. `.pi/skill-models.json` entry for the worker name
+3. prompt frontmatter `model:`
+4. Pi default model/provider configuration
 
-This keeps worker identity and model choice close to the prompt while still allowing emergency or test-time overrides.
+This lets PiLoop specify models for RPC worker subprocesses while the Pi extension uses the same routing file for interactive prompt and skill usage.
