@@ -27,3 +27,5 @@ dotnet run --project projects/piloop/src/PiLoop -- build --target-root <repo> --
 When rerunning against an existing sprint epic, PiLoop reuses known issues and does not create issues for newly generated task IDs unless `--allow-new-issues` is specified.
 
 `build` runs Pi workers for sprint tasks, captures changed files, runs simple detected validation (`dotnet` solution or `npm test`), commits each completed task by default, and publishes task-level evidence comments when GitHub is enabled.
+
+Prompt files can choose their own model with frontmatter `model:`. The CLI `--pi-model` option is now a global override only; if omitted, worker prompt metadata wins.

@@ -10,7 +10,6 @@ public sealed class BuildLoop
     private readonly bool _publishGitHub;
     private readonly PiWorkerRegistry _workerRegistry;
     private readonly PiWorkerContractBuilder _contractBuilder = new();
-    private readonly PiRpcRunner _rpcRunner;
     private readonly PiResultValidator _resultValidator = new();
     private readonly TempLogService _tempLogs = new();
 
@@ -21,7 +20,6 @@ public sealed class BuildLoop
         _publishGitHub = publishGitHub;
         StateManager.SetRepoRoot(targetRoot.FullName);
         _workerRegistry = new PiWorkerRegistry(targetRoot.FullName);
-        _rpcRunner = new PiRpcRunner(_piRuntime);
     }
 
     public async Task ExecuteAsync(string sprintNameOrPath, string? branch = null, bool commit = true)
@@ -125,8 +123,10 @@ public sealed class BuildLoop
     {
         var worker = _workerRegistry.Get(workerName);
         var prompt = await _contractBuilder.BuildAsync(worker.PromptPath, taskInput);
+        var workerRuntime = await ResolveWorkerRuntimeAsync(worker.PromptPath);
+        var rpcRunner = new PiRpcRunner(workerRuntime);
         ActivityLog.AgentStart(task.Id, workerName, 1);
-        var runResult = await _rpcRunner.RunPromptAsync(_targetRoot.FullName, prompt, worker.Timeout);
+        var runResult = await rpcRunner.RunPromptAsync(_targetRoot.FullName, prompt, worker.Timeout);
         var logPath = _tempLogs.GetWorkerLogPath(runId, task.Id, workerName);
         await _tempLogs.WriteWorkerLogAsync(logPath, runResult.RawLines, runResult.DiagnosticSummary);
         var result = _resultValidator.ValidateRequired(runResult, workerName);
@@ -136,6 +136,17 @@ public sealed class BuildLoop
             throw new InvalidOperationException($"{workerName} returned {result.Status}: {result.Summary}");
 
         return result;
+    }
+
+    private async Task<PiRuntimeOptions> ResolveWorkerRuntimeAsync(string promptPath)
+    {
+        if (!string.IsNullOrWhiteSpace(_piRuntime.Model))
+            return _piRuntime;
+
+        var metadata = await PiPromptMetadataReader.ReadAsync(promptPath);
+        return string.IsNullOrWhiteSpace(metadata.Model)
+            ? _piRuntime
+            : _piRuntime with { Model = metadata.Model };
     }
 
     private string BuildTaskPrompt(Prd sprint, PrdTask task, string workerName)

@@ -16,7 +16,6 @@ public sealed class PlanningLoop
     private readonly bool _allowNewGitHubIssues;
     private readonly PiWorkerRegistry _workerRegistry;
     private readonly PiWorkerContractBuilder _contractBuilder;
-    private readonly PiRpcRunner _rpcRunner;
     private readonly PiResultValidator _resultValidator;
     private readonly TempLogService _tempLogs;
 
@@ -33,7 +32,6 @@ public sealed class PlanningLoop
         _piRuntime = piRuntime ?? PiRuntimeOptions.From();
         _workerRegistry = new PiWorkerRegistry(targetRoot.FullName);
         _contractBuilder = new PiWorkerContractBuilder();
-        _rpcRunner = new PiRpcRunner(_piRuntime);
         _resultValidator = new PiResultValidator();
         _tempLogs = new TempLogService();
     }
@@ -210,9 +208,11 @@ public sealed class PlanningLoop
     {
         var worker = _workerRegistry.Get(workerName);
         var prompt = await _contractBuilder.BuildAsync(worker.PromptPath, taskInput);
+        var workerRuntime = await ResolveWorkerRuntimeAsync(worker.PromptPath);
+        var rpcRunner = new PiRpcRunner(workerRuntime);
 
         ActivityLog.AgentStart(taskId, workerName, 1);
-        var runResult = await _rpcRunner.RunPromptAsync(StateManager.RepoRoot, prompt, worker.Timeout);
+        var runResult = await rpcRunner.RunPromptAsync(StateManager.RepoRoot, prompt, worker.Timeout);
         var logPath = _tempLogs.GetWorkerLogPath(runId, taskId, workerName);
         await _tempLogs.WriteWorkerLogAsync(logPath, runResult.RawLines, runResult.DiagnosticSummary);
 
@@ -229,6 +229,17 @@ public sealed class PlanningLoop
             throw new InvalidOperationException($"{workerName} returned {result.Status}: {result.Summary}");
 
         return result;
+    }
+
+    private async Task<PiRuntimeOptions> ResolveWorkerRuntimeAsync(string promptPath)
+    {
+        if (!string.IsNullOrWhiteSpace(_piRuntime.Model))
+            return _piRuntime;
+
+        var metadata = await PiPromptMetadataReader.ReadAsync(promptPath);
+        return string.IsNullOrWhiteSpace(metadata.Model)
+            ? _piRuntime
+            : _piRuntime with { Model = metadata.Model };
     }
 
     private string BuildDesignerPrompt(bool hasAnswers)
