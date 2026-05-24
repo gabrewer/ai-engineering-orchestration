@@ -24,7 +24,7 @@ public sealed class BuildLoop
         _skillModelConfig = new SkillModelConfigService(targetRoot);
     }
 
-    public async Task ExecuteAsync(string sprintNameOrPath, string? branch = null, bool commit = true)
+    public async Task ExecuteAsync(string sprintNameOrPath, string? branch = null, bool commit = true, bool resume = false)
     {
         StateManager.EnsureDotDir();
         var prd = await PrdReader.ReadAsync(sprintNameOrPath);
@@ -32,9 +32,12 @@ public sealed class BuildLoop
         ActivityLog.Init(runId);
         ActivityLog.Info($"Build loop started for {prd.Sprint}");
 
+        var existingState = resume ? await StateManager.LoadStateAsync(prd.Sprint) : null;
         var git = new GitService(_targetRoot.FullName);
-        var targetBranch = await git.EnsureBranchAsync(branch, prd.Sprint);
-        var state = StateManager.NewRunState(prd.Sprint, targetBranch);
+        var requestedBranch = branch ?? existingState?.Branch;
+        var targetBranch = await git.EnsureBranchAsync(requestedBranch, prd.Sprint);
+        var state = existingState ?? StateManager.NewRunState(prd.Sprint, targetBranch);
+        state.Branch = targetBranch;
         await StateManager.SaveStateAsync(state);
 
         AnsiConsole.MarkupLine("[rgb(99,102,241)]⬡[/]  [bold]Build Loop[/]");
@@ -42,16 +45,36 @@ public sealed class BuildLoop
         AnsiConsole.MarkupLine($"[dim]  Sprint: {Markup.Escape(prd.Sprint)}[/]");
         AnsiConsole.MarkupLine($"[dim]  Branch: {Markup.Escape(targetBranch)}[/]");
         AnsiConsole.MarkupLine($"[dim]  Pi: {Markup.Escape(_piRuntime.PiCommand)}[/]");
+        if (resume && existingState is not null)
+            AnsiConsole.MarkupLine($"[dim]  Resuming run state: {Markup.Escape(existingState.RunId)}[/]");
         Console.WriteLine();
 
         if (_publishGitHub)
         {
-            await EnsureGitHubIssuesAsync(prd, state, targetBranch);
+            await EnsureGitHubIssuesAsync(prd, state, targetBranch, reuseExistingState: resume);
         }
 
         foreach (var task in prd.Tasks)
         {
-            await RunTaskAsync(prd, state, task, runId, commit);
+            if (StateManager.IsTaskDone(state, task.Id))
+            {
+                AnsiConsole.MarkupLine($"[dim]  Skipping {Markup.Escape(task.Id)} — already done.[/]");
+                continue;
+            }
+
+            try
+            {
+                await RunTaskAsync(prd, state, task, runId, commit);
+            }
+            catch (Exception ex)
+            {
+                var taskState = StateManager.EnsureTaskState(state, task.Id);
+                taskState.Status = Models.TaskStatus.Failed;
+                taskState.LastFeedback = ex.Message;
+                taskState.CompletedAt = DateTime.UtcNow.ToString("O");
+                await StateManager.SaveStateAsync(state);
+                throw;
+            }
         }
 
         await RunSprintValidationAsync(state);
@@ -60,10 +83,13 @@ public sealed class BuildLoop
         AnsiConsole.MarkupLine("[green]  ✓[/]  Build loop complete.");
     }
 
-    private async Task EnsureGitHubIssuesAsync(Prd prd, RunState state, string branch)
+    private async Task EnsureGitHubIssuesAsync(Prd prd, RunState state, string branch, bool reuseExistingState)
     {
+        if (reuseExistingState && state.Issues.EpicIssue is not null && state.Issues.TaskIssues.Count > 0)
+            return;
+
         var github = new GitHubService(_targetRoot.FullName);
-        var existing = await github.FindExistingSprintIssuesAsync(prd.Sprint);
+        var existing = state.Issues.EpicIssue is not null ? state.Issues : await github.FindExistingSprintIssuesAsync(prd.Sprint);
         var map = await github.CreateSprintIssuesAsync(prd, branch, existing: existing, createMissingTaskIssues: true);
         state.Issues = map;
         await StateManager.SaveStateAsync(state);

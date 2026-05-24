@@ -18,6 +18,7 @@ dotnet run --project projects/piloop/src/PiLoop -- plan --target-root <repo> --p
 dotnet run --project projects/piloop/src/PiLoop -- plan --target-root <repo> --prd docs/PRD.md --allow-new-issues
 dotnet run --project projects/piloop/src/PiLoop -- build --target-root <repo> --prd <sprint-name-or-json>
 dotnet run --project projects/piloop/src/PiLoop -- build --target-root <repo> --all --skip-github
+dotnet run --project projects/piloop/src/PiLoop -- build --target-root <repo> --prd <sprint-name-or-json> --resume
 ```
 
 `init` installs default generic planning prompts under `.pi/prompts/` if they are missing.
