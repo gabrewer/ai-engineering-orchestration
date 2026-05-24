@@ -172,29 +172,23 @@ public sealed class PlanningLoop
 
                 if (map.EpicIssue is { } epic)
                 {
-                    await audit.PublishToEpicAsync(epic, new BreadcrumbEvent(
-                        BreadcrumbTarget.Epic,
-                        "Planning completed",
+                    await audit.PublishEvidenceToEpicAsync(epic, EvidenceRenderer.FromWorkerResult(
+                        designerResult,
+                        EvidenceTarget.Epic,
+                        EvidenceStatus.Completed,
                         "product-designer",
-                        BreadcrumbStatus.Completed,
-                        designerResult.Summary,
-                        designerResult.Why,
-                        designerResult.AlternativesConsidered,
-                        designerResult.Confidence,
-                        "Sprint briefs are available for execution planning.",
-                        designerResult.Artifacts.Select(a => a.Path).ToArray()));
+                        "Planning completed",
+                        "Expand the PRD milestones into defensible sprint briefs.",
+                        "Read the PRD, resolve product ambiguity, write sprint briefs, and record any questions."));
 
-                    await audit.PublishToEpicAsync(epic, new BreadcrumbEvent(
-                        BreadcrumbTarget.Epic,
-                        "Sprint plan created",
+                    await audit.PublishEvidenceToEpicAsync(epic, EvidenceRenderer.FromWorkerResult(
+                        pmResult,
+                        EvidenceTarget.Epic,
+                        EvidenceStatus.Completed,
                         "pm",
-                        BreadcrumbStatus.Completed,
-                        pmResult.Summary,
-                        pmResult.Why,
-                        pmResult.AlternativesConsidered,
-                        pmResult.Confidence,
-                        "Sprint plan is ready for human review or build execution.",
-                        pmResult.Artifacts.Select(a => a.Path).ToArray()));
+                        "Sprint plan created",
+                        "Convert sprint briefs into task-level plans that future workers can execute.",
+                        "Read generated sprint briefs, split work into small tasks, write sprint JSON artifacts, and preserve traceability to the PRD."));
                 }
             }
             catch (Exception ex)

@@ -27,6 +27,15 @@ public sealed class GitHubAuditService
     public Task PublishAsync(int issueNumber, BreadcrumbEvent breadcrumb) =>
         _github.CommentOnIssueAsync(issueNumber, FormatBreadcrumbComment(breadcrumb));
 
+    public Task PublishEvidenceToEpicAsync(int epicIssueNumber, EvidenceEvent evidence) =>
+        PublishEvidenceAsync(epicIssueNumber, evidence with { Target = EvidenceTarget.Epic });
+
+    public Task PublishEvidenceToTaskAsync(int taskIssueNumber, EvidenceEvent evidence) =>
+        PublishEvidenceAsync(taskIssueNumber, evidence with { Target = EvidenceTarget.Task });
+
+    public Task PublishEvidenceAsync(int issueNumber, EvidenceEvent evidence) =>
+        _github.CommentOnIssueAsync(issueNumber, EvidenceRenderer.RenderMarkdown(evidence));
+
     internal static string FormatBreadcrumbComment(BreadcrumbEvent breadcrumb)
     {
         var builder = new StringBuilder();

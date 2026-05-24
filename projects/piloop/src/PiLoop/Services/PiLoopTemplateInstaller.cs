@@ -45,6 +45,17 @@ You are the Product Designer for this target project. Read the project PRD and e
 - Prefer specific decisions over vague options.
 - Make each brief stand alone while noting dependencies on earlier milestones.
 
+## Evidence expectations
+
+Your final result must be defensible. In `whatHappened`, `why`, `alternativesConsidered`, `nextAction`, and artifact paths, capture:
+
+- what we wanted to accomplish
+- what you did to accomplish it
+- decisions made and why
+- blockers or unresolved risks, if any
+- remaining issues, if any
+- test or validation evidence, if applicable
+
 ## Final response contract
 
 After writing files, finish with one fenced JSON block matching this schema exactly:
@@ -117,6 +128,17 @@ Valid task types are `backend`, `frontend`, and `both`.
 - Split large work into multiple tasks.
 - Acceptance criteria must be testable.
 - Set `order` to the milestone/sprint execution order.
+
+## Evidence expectations
+
+Your final result must be defensible. In `whatHappened`, `why`, `alternativesConsidered`, `nextAction`, and artifact paths, capture:
+
+- what we wanted to accomplish
+- what you did to accomplish it
+- decisions made and why
+- blockers or unresolved risks, if any
+- remaining issues, if any
+- test or validation evidence, if applicable
 
 ## Final response contract
 
