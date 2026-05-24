@@ -47,6 +47,7 @@ PiLoop should support two onboarding paths:
 - `docs/workflow-existing-project.md` — adoption workflow for existing repos
 - `docs/migration-plan.md` — how Pi-native code moves out of TrakPomo into this repo
 - `docs/integration-test-piloop-test.md` — disposable GitHub-backed integration test notes
+- `docs/evidence-contract.md` — what PiLoop records to GitHub Issues for defensible work history
 
 ## Current status
 
