@@ -81,12 +81,17 @@ var skipGitHubOption = new Option<bool>("--skip-github")
 {
     Description = "Write local sprint artifacts but do not create or update GitHub issues."
 };
+var allowNewIssuesOption = new Option<bool>("--allow-new-issues")
+{
+    Description = "When reusing an existing sprint epic, create GitHub issues for newly generated task IDs."
+};
 
 var planCommand = new Command("plan", "Run the Pi-backed planning loop for a target project.")
 {
     targetRootOption,
     prdOption,
     skipGitHubOption,
+    allowNewIssuesOption,
     piCommandOption,
     piProviderOption,
     piModelOption,
@@ -113,7 +118,12 @@ planCommand.SetAction(async (result, ct) =>
         }
 
         await PiLoopTemplateInstaller.InstallAsync(target.Root);
-        var loop = new PlanningLoop(target.Root, prd, piRuntime, publishGitHub: !result.GetValue(skipGitHubOption));
+        var loop = new PlanningLoop(
+            target.Root,
+            prd,
+            piRuntime,
+            publishGitHub: !result.GetValue(skipGitHubOption),
+            allowNewGitHubIssues: result.GetValue(allowNewIssuesOption));
         await loop.ExecuteAsync();
     }
     catch (Exception ex)

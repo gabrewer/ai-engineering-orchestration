@@ -140,7 +140,9 @@ public sealed class GitHubService
     /// Returns a mapping of task IDs → issue numbers.
     /// </summary>
     public async Task<IssueMap> CreateSprintIssuesAsync(Prd prd, string branch,
-        Func<IssueMap, Task>? onProgress = null, IssueMap? existing = null)
+        Func<IssueMap, Task>? onProgress = null,
+        IssueMap? existing = null,
+        bool createMissingTaskIssues = true)
     {
         // Ensure all required labels exist
         await EnsureLabelsAsync(["epic", "task", "piloop"]);
@@ -189,6 +191,12 @@ public sealed class GitHubService
         {
             // Skip tasks that already have issues (partial resume)
             if (taskIssues.ContainsKey(task.Id)) continue;
+
+            if (!createMissingTaskIssues)
+            {
+                AnsiConsole.MarkupLine($"[yellow]  Skipped new issue for {Markup.Escape(task.Id)}; rerun with --allow-new-issues to create tasks added by replanning.[/]");
+                continue;
+            }
 
             var taskBody = new StringBuilder();
             taskBody.AppendLine($"Parent: #{epicNumber}");
@@ -241,8 +249,10 @@ public sealed class GitHubService
 
         foreach (var task in prd.Tasks)
         {
-            var num = taskIssues[task.Id];
-            linkedBody.AppendLine($"- [ ] **{task.Id}**: {task.Title} (#{num})");
+            if (taskIssues.TryGetValue(task.Id, out var num))
+                linkedBody.AppendLine($"- [ ] **{task.Id}**: {task.Title} (#{num})");
+            else
+                linkedBody.AppendLine($"- [ ] **{task.Id}**: {task.Title} _(issue not created; rerun with --allow-new-issues)_");
         }
 
         await RunGhAsync("issue", "edit", epicNumber.ToString(), "--body", linkedBody.ToString());

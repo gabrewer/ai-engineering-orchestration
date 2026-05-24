@@ -83,7 +83,8 @@ public static class PrdReader
             .Where(f =>
             {
                 var name = Path.GetFileName(f);
-                return !name.StartsWith("questions", StringComparison.OrdinalIgnoreCase);
+                return !name.StartsWith("questions", StringComparison.OrdinalIgnoreCase)
+                    && !name.Equals("plan-manifest.json", StringComparison.OrdinalIgnoreCase);
             })
             .OrderByDescending(f => f) // most recent first within each group
             .ToArray();
