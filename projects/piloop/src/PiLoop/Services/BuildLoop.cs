@@ -9,6 +9,7 @@ public sealed class BuildLoop
     private readonly PiRuntimeOptions _piRuntime;
     private readonly bool _publishGitHub;
     private readonly PiWorkerRegistry _workerRegistry;
+    private readonly SkillModelConfigService _skillModelConfig;
     private readonly PiWorkerContractBuilder _contractBuilder = new();
     private readonly PiResultValidator _resultValidator = new();
     private readonly TempLogService _tempLogs = new();
@@ -20,6 +21,7 @@ public sealed class BuildLoop
         _publishGitHub = publishGitHub;
         StateManager.SetRepoRoot(targetRoot.FullName);
         _workerRegistry = new PiWorkerRegistry(targetRoot.FullName);
+        _skillModelConfig = new SkillModelConfigService(targetRoot);
     }
 
     public async Task ExecuteAsync(string sprintNameOrPath, string? branch = null, bool commit = true)
@@ -123,7 +125,7 @@ public sealed class BuildLoop
     {
         var worker = _workerRegistry.Get(workerName);
         var prompt = await _contractBuilder.BuildAsync(worker.PromptPath, taskInput);
-        var workerRuntime = await ResolveWorkerRuntimeAsync(worker.PromptPath);
+        var workerRuntime = await ResolveWorkerRuntimeAsync(workerName, worker.PromptPath);
         var rpcRunner = new PiRpcRunner(workerRuntime);
         ActivityLog.AgentStart(task.Id, workerName, 1);
         var runResult = await rpcRunner.RunPromptAsync(_targetRoot.FullName, prompt, worker.Timeout);
@@ -138,15 +140,29 @@ public sealed class BuildLoop
         return result;
     }
 
-    private async Task<PiRuntimeOptions> ResolveWorkerRuntimeAsync(string promptPath)
+    private async Task<PiRuntimeOptions> ResolveWorkerRuntimeAsync(string workerName, string promptPath)
     {
-        if (!string.IsNullOrWhiteSpace(_piRuntime.Model))
-            return _piRuntime;
+        var runtime = _piRuntime;
 
-        var metadata = await PiPromptMetadataReader.ReadAsync(promptPath);
-        return string.IsNullOrWhiteSpace(metadata.Model)
-            ? _piRuntime
-            : _piRuntime with { Model = metadata.Model };
+        var skillModel = await _skillModelConfig.FindAsync(workerName);
+        if (skillModel is not null)
+        {
+            runtime = runtime with
+            {
+                Provider = string.IsNullOrWhiteSpace(runtime.Provider) ? skillModel.Provider : runtime.Provider,
+                Model = string.IsNullOrWhiteSpace(runtime.Model) ? skillModel.Model : runtime.Model,
+                Thinking = string.IsNullOrWhiteSpace(runtime.Thinking) ? skillModel.ThinkingLevel : runtime.Thinking,
+            };
+        }
+
+        if (string.IsNullOrWhiteSpace(runtime.Model))
+        {
+            var metadata = await PiPromptMetadataReader.ReadAsync(promptPath);
+            if (!string.IsNullOrWhiteSpace(metadata.Model))
+                runtime = runtime with { Model = metadata.Model };
+        }
+
+        return runtime;
     }
 
     private string BuildTaskPrompt(Prd sprint, PrdTask task, string workerName)
