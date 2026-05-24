@@ -18,7 +18,7 @@ var piProviderOption = new Option<string?>("--pi-provider")
 };
 var piModelOption = new Option<string?>("--pi-model")
 {
-    Description = "Pi model to use for worker processes."
+    Description = "Override the model for all Pi worker processes. If omitted, each prompt may choose its own frontmatter model."
 };
 var piThinkingOption = new Option<string?>("--pi-thinking")
 {
