@@ -13,6 +13,7 @@ public sealed class PlanningLoop
     private readonly string _runTimestamp;
     private readonly PiRuntimeOptions _piRuntime;
     private readonly bool _publishGitHub;
+    private readonly bool _allowNewGitHubIssues;
     private readonly PiWorkerRegistry _workerRegistry;
     private readonly PiWorkerContractBuilder _contractBuilder;
     private readonly PiRpcRunner _rpcRunner;
@@ -21,11 +22,12 @@ public sealed class PlanningLoop
 
     private const string AnswersPath = "docs/sprints/answers.md";
 
-    public PlanningLoop(DirectoryInfo targetRoot, string prdPath, PiRuntimeOptions? piRuntime = null, bool publishGitHub = true)
+    public PlanningLoop(DirectoryInfo targetRoot, string prdPath, PiRuntimeOptions? piRuntime = null, bool publishGitHub = true, bool allowNewGitHubIssues = false)
     {
         _targetRoot = targetRoot;
         _prdPath = prdPath;
         _publishGitHub = publishGitHub;
+        _allowNewGitHubIssues = allowNewGitHubIssues;
         StateManager.SetRepoRoot(targetRoot.FullName);
         _runTimestamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
         _piRuntime = piRuntime ?? PiRuntimeOptions.From();
@@ -92,19 +94,10 @@ public sealed class PlanningLoop
             }
         }
 
-        Console.WriteLine();
-        if (!_publishGitHub)
-        {
-            AnsiConsole.MarkupLine("[yellow]Step 3:[/] Skipping GitHub issue creation (--skip-github).");
-            Console.WriteLine();
-            AnsiConsole.MarkupLine("[green]  ✓[/]  All sprint plans written to [bold]docs/sprints/[/]");
-            return;
-        }
+        var manifestService = new PlanManifestService(_targetRoot);
+        var manifest = await manifestService.LoadAsync();
+        var prdHash = await manifestService.ComputeFileHashAsync(_prdPath);
 
-        AnsiConsole.MarkupLine("[bold]Step 3:[/] Creating GitHub issues for each sprint");
-
-        var github = new GitHubService(_targetRoot.FullName);
-        var audit = new GitHubAuditService(_targetRoot.FullName);
         string[] sprintFiles;
         try
         {
@@ -122,10 +115,60 @@ public sealed class PlanningLoop
             {
                 var prd = await PrdReader.ReadAsync(file);
                 var logicalSprint = PrdReader.ExtractLogicalSprintName(file);
+                var briefPath = manifestService.FindLatestBriefForLogicalSprint(logicalSprint);
+                var existingEntry = manifestService.Find(manifest, prdHash, logicalSprint);
+                manifestService.Upsert(
+                    manifest,
+                    _prdPath,
+                    prdHash,
+                    logicalSprint,
+                    prd.Sprint,
+                    briefPath,
+                    file,
+                    _runTimestamp,
+                    existingEntry?.GitHubIssues);
+            }
+            catch (Exception ex)
+            {
+                var sprintName = PrdReader.ExtractLogicalSprintName(file);
+                AnsiConsole.MarkupLine($"[yellow]  Warning: Failed to add {Markup.Escape(sprintName)} to manifest: {Markup.Escape(ex.Message)}[/]");
+            }
+        }
+        await manifestService.SaveAsync(manifest);
+
+        Console.WriteLine();
+        AnsiConsole.MarkupLine($"[dim]  Manifest: {Markup.Escape(Path.GetRelativePath(_targetRoot.FullName, manifestService.ManifestPath))}[/]");
+
+        if (!_publishGitHub)
+        {
+            AnsiConsole.MarkupLine("[yellow]Step 3:[/] Skipping GitHub issue creation (--skip-github).");
+            Console.WriteLine();
+            AnsiConsole.MarkupLine("[green]  ✓[/]  All sprint plans written to [bold]docs/sprints/[/]");
+            return;
+        }
+
+        AnsiConsole.MarkupLine("[bold]Step 3:[/] Creating GitHub issues for each sprint");
+
+        var github = new GitHubService(_targetRoot.FullName);
+        var audit = new GitHubAuditService(_targetRoot.FullName);
+
+        foreach (var file in sprintFiles)
+        {
+            try
+            {
+                var prd = await PrdReader.ReadAsync(file);
+                var logicalSprint = PrdReader.ExtractLogicalSprintName(file);
                 var branch = $"feature/{logicalSprint}";
-                var existing = await github.FindExistingSprintIssuesAsync(prd.Sprint);
-                var map = await github.CreateSprintIssuesAsync(prd, branch, existing: existing);
-                AnsiConsole.MarkupLine($"[green]  ✓[/]  {prd.Sprint}: epic #{map.EpicIssue}, {map.TaskIssues.Count} task issues");
+                var manifestEntry = manifestService.Find(manifest, prdHash, logicalSprint);
+                var existing = manifestEntry?.GitHubIssues ?? await github.FindExistingSprintIssuesAsync(prd.Sprint);
+                var hadExistingIssues = existing?.EpicIssue is not null;
+                var createMissingTaskIssues = !hadExistingIssues || _allowNewGitHubIssues;
+                var map = await github.CreateSprintIssuesAsync(prd, branch, existing: existing, createMissingTaskIssues: createMissingTaskIssues);
+                var briefPath = manifestService.FindLatestBriefForLogicalSprint(logicalSprint);
+                manifestService.Upsert(manifest, _prdPath, prdHash, logicalSprint, prd.Sprint, briefPath, file, _runTimestamp, map);
+                await manifestService.SaveAsync(manifest);
+                var issueVerb = hadExistingIssues ? "reused" : "created";
+                AnsiConsole.MarkupLine($"[green]  ✓[/]  {prd.Sprint}: {issueVerb} epic #{map.EpicIssue}, {map.TaskIssues.Count} task issues");
 
                 if (map.EpicIssue is { } epic)
                 {
