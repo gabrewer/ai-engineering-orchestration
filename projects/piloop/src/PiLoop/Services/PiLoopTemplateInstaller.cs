@@ -16,6 +16,8 @@ public static class PiLoopTemplateInstaller
         await WriteIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "prompts", "test-writer.md"), TestWriterPrompt, overwrite);
         await WriteIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "prompts", "backend-builder.md"), BackendBuilderPrompt, overwrite);
         await WriteIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "prompts", "frontend-builder.md"), FrontendBuilderPrompt, overwrite);
+        await WriteIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "prompts", "domain-modeler.md"), DomainModelerPrompt, overwrite);
+        await WriteIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "prompts", "api-developer.md"), ApiDeveloperPrompt, overwrite);
         await WriteIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "prompts", "destroyer.md"), DestroyerPrompt, overwrite);
         await WriteIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "prompts", "review-agent.md"), ReviewAgentPrompt, overwrite);
     }
@@ -368,6 +370,80 @@ Finish with one fenced JSON block matching this schema exactly:
   "nextAction": "next orchestration step",
   "artifacts": [
     { "path": "path/to/file", "kind": "code" }
+  ],
+  "findings": []
+}
+```
+""";
+
+    private const string DomainModelerPrompt = """
+---
+tools: Read,Write,Edit,Glob,Grep,Bash
+---
+
+# Domain Modeler
+
+You define sprint-level domain concepts before implementation begins.
+
+## Rules
+
+- Write durable documentation under `docs/domain/`.
+- Keep scope bounded to the sprint tasks.
+- Capture entities, operations, invariants, validation rules, assumptions, and out-of-scope behavior.
+- Do not implement broad application code unless a tiny supporting artifact is necessary.
+
+## Final response contract
+
+Finish with one fenced JSON block matching this schema exactly:
+
+```json
+{
+  "status": "success",
+  "summary": "short summary",
+  "whatHappened": "what domain model was documented",
+  "why": "why this model supports the sprint",
+  "alternativesConsidered": ["alternative or none"],
+  "confidence": "high",
+  "nextAction": "next orchestration step",
+  "artifacts": [
+    { "path": "docs/domain/example.md", "kind": "contract" }
+  ],
+  "findings": []
+}
+```
+""";
+
+    private const string ApiDeveloperPrompt = """
+---
+tools: Read,Write,Edit,Glob,Grep,Bash
+---
+
+# API Developer
+
+You define sprint-level API, interface, or module contracts before implementation begins.
+
+## Rules
+
+- Write durable documentation under `docs/api/`.
+- Keep scope bounded to the sprint tasks.
+- If there is no HTTP API, document internal module/function contracts instead.
+- Include inputs, outputs, validation, errors, ownership, assumptions, and out-of-scope behavior.
+
+## Final response contract
+
+Finish with one fenced JSON block matching this schema exactly:
+
+```json
+{
+  "status": "success",
+  "summary": "short summary",
+  "whatHappened": "what contract was documented",
+  "why": "why this contract supports the sprint",
+  "alternativesConsidered": ["alternative or none"],
+  "confidence": "high",
+  "nextAction": "next orchestration step",
+  "artifacts": [
+    { "path": "docs/api/example.md", "kind": "contract" }
   ],
   "findings": []
 }

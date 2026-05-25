@@ -62,6 +62,8 @@ public sealed class BuildLoop
             await EnsureGitHubIssuesAsync(prd, state, targetBranch, reuseExistingState: resume);
         }
 
+        await RunSprintPhasesAsync(prd, state, runId);
+
         foreach (var task in prd.Tasks)
         {
             if (StateManager.IsTaskDone(state, task.Id))
@@ -137,6 +139,57 @@ public sealed class BuildLoop
         await StateManager.SaveStateAsync(state);
     }
 
+    private async Task RunSprintPhasesAsync(Prd prd, RunState state, string runId)
+    {
+        var phases = prd.EffectivePhases;
+
+        if (phases.DomainModeling && state.Phases.DomainModeling != SprintPhaseStatus.Done)
+        {
+            state.Phases.DomainModeling = SprintPhaseStatus.Running;
+            await StateManager.SaveStateAsync(state);
+            try
+            {
+                await RunSprintWorkerAsync(runId, prd, "domain-modeler", BuildDomainModelPrompt(prd));
+                state.Phases.DomainModeling = SprintPhaseStatus.Done;
+            }
+            catch
+            {
+                state.Phases.DomainModeling = SprintPhaseStatus.Failed;
+                await StateManager.SaveStateAsync(state);
+                throw;
+            }
+            await StateManager.SaveStateAsync(state);
+        }
+        else if (!phases.DomainModeling)
+        {
+            state.Phases.DomainModeling = SprintPhaseStatus.Done;
+            await StateManager.SaveStateAsync(state);
+        }
+
+        if (phases.ApiContract && state.Phases.ApiContract != SprintPhaseStatus.Done)
+        {
+            state.Phases.ApiContract = SprintPhaseStatus.Running;
+            await StateManager.SaveStateAsync(state);
+            try
+            {
+                await RunSprintWorkerAsync(runId, prd, "api-developer", BuildApiContractPrompt(prd));
+                state.Phases.ApiContract = SprintPhaseStatus.Done;
+            }
+            catch
+            {
+                state.Phases.ApiContract = SprintPhaseStatus.Failed;
+                await StateManager.SaveStateAsync(state);
+                throw;
+            }
+            await StateManager.SaveStateAsync(state);
+        }
+        else if (!phases.ApiContract)
+        {
+            state.Phases.ApiContract = SprintPhaseStatus.Done;
+            await StateManager.SaveStateAsync(state);
+        }
+    }
+
     private async Task RunTaskAsync(Prd sprint, RunState state, PrdTask task, string runId, bool commit)
     {
         var taskState = StateManager.EnsureTaskState(state, task.Id);
@@ -196,6 +249,32 @@ public sealed class BuildLoop
         }
 
         ActivityLog.TaskDone(task.Id, taskState.Status);
+    }
+
+    private async Task<PiWorkerResult> RunSprintWorkerAsync(string runId, Prd prd, string workerName, string taskInput)
+    {
+        var task = new PrdTask($"sprint-{workerName}", $"{workerName} — {prd.Sprint}", TaskType.Both, taskInput, []);
+        var result = await RunWorkerAsync(runId, task, workerName, taskInput);
+
+        var audit = _publishGitHub && File.Exists(Path.Combine(_targetRoot.FullName, ".git"))
+            ? new GitHubAuditService(_targetRoot.FullName)
+            : null;
+        var state = await StateManager.LoadStateAsync(prd.Sprint);
+        if (audit is not null && state?.Issues.EpicIssue is { } epic)
+        {
+            await audit.PublishEvidenceToEpicAsync(epic, EvidenceRenderer.FromWorkerResult(
+                result,
+                EvidenceTarget.Epic,
+                EvidenceStatus.Completed,
+                workerName,
+                workerName == "domain-modeler" ? "Domain model completed" : "API contract completed",
+                workerName == "domain-modeler"
+                    ? "Define or update the sprint domain model before task implementation."
+                    : "Define or update the sprint API contract before task implementation.",
+                "Run the sprint-level Pi worker, write durable design artifacts, and record the rationale."));
+        }
+
+        return result;
     }
 
     private async Task<PiWorkerResult> RunWorkerAsync(string runId, PrdTask task, string workerName, string taskInput)
@@ -281,6 +360,78 @@ Your final JSON must make the work defensible. Include what you changed, why, al
 - Keep changes bounded to this task.
 - Prefer simple, maintainable implementation.
 - If the repo lacks an app scaffold, create the smallest structure needed for the task and document how to continue.
+""";
+    }
+
+    private static string BuildDomainModelPrompt(Prd prd)
+    {
+        var taskSummary = string.Join('\n', prd.Tasks.Select(t =>
+            $"- {t.Id}: {t.Title} ({t.Type})\n  {t.Description}"));
+
+        return $"""
+# Sprint: {prd.Sprint}
+
+{prd.Description}
+
+## Tasks in This Sprint
+
+{taskSummary}
+
+## Your Mission
+
+Define or update the domain model for this sprint's scope.
+
+Create `docs/domain/` if it does not exist.
+Output your domain model to `docs/domain/{prd.Sprint}.md`.
+
+For each domain concept touched by these tasks, define:
+- entities or aggregates
+- value objects
+- commands or operations
+- state transitions
+- invariants and validation rules
+- assumptions and out-of-scope behavior
+
+## Evidence Requirements
+Your final JSON must make the work defensible. Include what you changed, why, alternatives considered, blockers, remaining issues, validation performed, and artifacts.
+""";
+    }
+
+    private static string BuildApiContractPrompt(Prd prd)
+    {
+        var taskSummary = string.Join('\n', prd.Tasks.Select(t =>
+            $"- {t.Id}: {t.Title} ({t.Type})\n  {t.Description}"));
+
+        return $"""
+# Sprint: {prd.Sprint}
+
+{prd.Description}
+
+## Tasks in This Sprint
+
+{taskSummary}
+
+## Your Mission
+
+Define or update the API or interface contract for this sprint's scope.
+
+Create `docs/api/` if it does not exist.
+Output your contract to `docs/api/{prd.Sprint}.md`.
+
+If this project does not expose HTTP APIs yet, document the internal module/interface contract needed by the tasks instead.
+
+For each operation needed by these tasks, define:
+- name and purpose
+- input shape
+- output shape
+- validation/errors
+- owning module or layer
+- assumptions and out-of-scope behavior
+
+Read `docs/domain/{prd.Sprint}.md` first if it exists.
+
+## Evidence Requirements
+Your final JSON must make the work defensible. Include what you changed, why, alternatives considered, blockers, remaining issues, validation performed, and artifacts.
 """;
     }
 

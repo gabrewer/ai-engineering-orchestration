@@ -35,6 +35,11 @@ Use `--no-worktree` only when you intentionally want workers to modify the targe
 
 ## Current behavior
 
+Before task execution, PiLoop runs sprint-level phases when enabled by the sprint JSON:
+
+- `domain-modeler` writes `docs/domain/<sprint>.md` when `phases.domainModeling` is true
+- `api-developer` writes `docs/api/<sprint>.md` when `phases.apiContract` is true
+
 For each task, PiLoop:
 
 1. marks task execution as started in GitHub Issues when enabled
@@ -61,7 +66,7 @@ Tasks marked `failed`, `building`, `testing`, `destroying`, or `reviewing` are r
 ## Current limitations
 
 - This is the first Pi-native build extraction and intentionally simpler than the original TrakPomo loop.
-- It does not yet run domain-modeler, api-developer, or git-committer phases.
+- It does not yet run git-committer as a separate worker phase; commits are created by PiLoop directly.
 - It executes tasks sequentially rather than dependency waves.
 - It does not yet auto-fix failed validation.
 - Worktree resume currently starts a fresh worktree; use `--no-worktree --resume` to resume existing state in the target root.
