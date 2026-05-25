@@ -168,11 +168,19 @@ public sealed class BuildLoop
         foreach (var builder in GetBuilders(task.Type))
             workerResults.Add(await RunWorkerAsync(runId, task, builder, BuildTaskPrompt(sprint, task, builder)));
 
+        var validation = await RunValidationAsync();
+        if (validation.Passed)
+        {
+            workerResults.Add(await RunWorkerAsync(runId, task, "destroyer", BuildTaskPrompt(sprint, task, "destroyer")));
+            var review = await RunReviewLoopAsync(sprint, task, runId, workerResults);
+            workerResults.AddRange(review.Results);
+            validation = review.Validation;
+        }
+
         var after = await WorktreeChangeTracker.CaptureAsync(_targetRoot.FullName);
         var changes = before.Diff(after);
-        var validation = await RunValidationAsync();
 
-        var gitCommit = commit && changes.Count > 0
+        var gitCommit = commit && validation.Passed && changes.Count > 0
             ? await CommitTaskAsync(task)
             : null;
 
@@ -245,6 +253,8 @@ public sealed class BuildLoop
             "test-writer" => "Create or update focused tests or validation documentation for this task before implementation.",
             "frontend-builder" => "Implement frontend/UI behavior for this task.",
             "backend-builder" => "Implement backend/domain/infrastructure behavior for this task.",
+            "destroyer" => "Adversarially inspect the task implementation. Try to break it, run focused checks, and report concrete findings. Do not make broad unrelated changes.",
+            "review-agent" => "Review the implementation and destroyer findings. Return success only if the task is defensible; return changes_needed with concrete feedback if fixes are required.",
             _ => "Implement this task.",
         };
 
@@ -273,6 +283,43 @@ Your final JSON must make the work defensible. Include what you changed, why, al
 - If the repo lacks an app scaffold, create the smallest structure needed for the task and document how to continue.
 """;
     }
+
+    private async Task<ReviewLoopResult> RunReviewLoopAsync(Prd sprint, PrdTask task, string runId, List<PiWorkerResult> priorResults)
+    {
+        var results = new List<PiWorkerResult>();
+        var validation = await RunValidationAsync();
+        if (!validation.Passed)
+            return new ReviewLoopResult(results, validation);
+
+        var feedback = BuildReviewContext(priorResults);
+        for (var attempt = 1; attempt <= 3; attempt++)
+        {
+            var reviewResult = await RunWorkerAsync(runId, task, "review-agent", BuildTaskPrompt(sprint, task, "review-agent") + $"\n\n## Review Context\n{feedback}");
+            results.Add(reviewResult);
+
+            if (reviewResult.Status is PiWorkerStatus.Success)
+                return new ReviewLoopResult(results, validation);
+
+            if (reviewResult.Status is PiWorkerStatus.Blocked or PiWorkerStatus.Failed or PiWorkerStatus.Escalate)
+                return new ReviewLoopResult(results, validation with { Passed = false, Summary = $"Review failed: {reviewResult.Summary}" });
+
+            if (reviewResult.Status is not PiWorkerStatus.ChangesNeeded || attempt == 3)
+                return new ReviewLoopResult(results, validation with { Passed = false, Summary = $"Review did not approve after {attempt} attempt(s): {reviewResult.Summary}" });
+
+            feedback = reviewResult.WhatHappened + "\n\n" + reviewResult.NextAction;
+            foreach (var builder in GetBuilders(task.Type))
+                results.Add(await RunWorkerAsync(runId, task, builder, BuildTaskPrompt(sprint, task, builder) + $"\n\n## Review Feedback To Fix\n{feedback}"));
+
+            validation = await RunValidationAsync();
+            if (!validation.Passed)
+                return new ReviewLoopResult(results, validation);
+        }
+
+        return new ReviewLoopResult(results, validation with { Passed = false, Summary = "Review loop exhausted." });
+    }
+
+    private static string BuildReviewContext(IEnumerable<PiWorkerResult> results) =>
+        string.Join("\n\n", results.Select(r => $"## {r.Status}: {r.Summary}\n{r.WhatHappened}\nWhy: {r.Why}\nNext: {r.NextAction}"));
 
     private async Task<ValidationResult> RunValidationAsync()
     {
@@ -398,5 +445,6 @@ Your final JSON must make the work defensible. Include what you changed, why, al
     }
 
     private sealed record ValidationResult(bool Passed, string Summary, EvidenceTestResult[] TestResults);
+    private sealed record ReviewLoopResult(List<PiWorkerResult> Results, ValidationResult Validation);
     private sealed record GitCommitInfo(string Sha, string ShortSha);
 }

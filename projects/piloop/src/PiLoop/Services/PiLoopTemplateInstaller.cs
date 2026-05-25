@@ -16,6 +16,8 @@ public static class PiLoopTemplateInstaller
         await WriteIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "prompts", "test-writer.md"), TestWriterPrompt, overwrite);
         await WriteIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "prompts", "backend-builder.md"), BackendBuilderPrompt, overwrite);
         await WriteIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "prompts", "frontend-builder.md"), FrontendBuilderPrompt, overwrite);
+        await WriteIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "prompts", "destroyer.md"), DestroyerPrompt, overwrite);
+        await WriteIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "prompts", "review-agent.md"), ReviewAgentPrompt, overwrite);
     }
 
     private static async Task WriteIfMissingAsync(string path, string content, bool overwrite)
@@ -367,6 +369,77 @@ Finish with one fenced JSON block matching this schema exactly:
   "artifacts": [
     { "path": "path/to/file", "kind": "code" }
   ],
+  "findings": []
+}
+```
+""";
+
+    private const string DestroyerPrompt = """
+---
+tools: Read,Write,Edit,Glob,Grep,Bash
+---
+
+# Destroyer
+
+You adversarially review the completed task. Try to break assumptions, run focused checks, and identify defects, missing tests, scope creep, or weak evidence.
+
+## Rules
+
+- Stay bounded to the assigned task.
+- Prefer running existing validation before inventing new checks.
+- Do not make broad unrelated changes.
+- If you find issues, report them as findings with severity and concrete recommendations.
+
+## Final response contract
+
+Finish with one fenced JSON block matching this schema exactly:
+
+```json
+{
+  "status": "success",
+  "summary": "short summary",
+  "whatHappened": "what you checked and found",
+  "why": "why these checks are sufficient or what risk remains",
+  "alternativesConsidered": ["alternative or none"],
+  "confidence": "high",
+  "nextAction": "next orchestration step",
+  "artifacts": [
+    { "path": "path/to/evidence", "kind": "log" }
+  ],
+  "findings": []
+}
+```
+""";
+
+    private const string ReviewAgentPrompt = """
+---
+tools: Read,Write,Edit,Glob,Grep,Bash
+---
+
+# Review Agent
+
+You decide whether the task is defensible. Review implementation evidence, changed files, validation output, and destroyer findings.
+
+## Status rules
+
+- Return `success` only when the task satisfies acceptance criteria and evidence is defensible.
+- Return `changes_needed` when concrete fixes are required.
+- Return `blocked`, `failed`, or `escalate` only for serious unresolved issues.
+
+## Final response contract
+
+Finish with one fenced JSON block matching this schema exactly:
+
+```json
+{
+  "status": "success",
+  "summary": "approval or required changes summary",
+  "whatHappened": "what you reviewed",
+  "why": "why this is approved or why changes are needed",
+  "alternativesConsidered": ["alternative or none"],
+  "confidence": "high",
+  "nextAction": "next orchestration step",
+  "artifacts": [],
   "findings": []
 }
 ```
