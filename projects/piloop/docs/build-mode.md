@@ -33,7 +33,7 @@ For each task, PiLoop:
    - `npm test` when `package.json` exists
    - otherwise records validation as skipped
 6. commits task changes unless `--no-commit` is specified
-7. publishes a task evidence comment with intent, plan, work performed, decisions, blockers, test results, remaining issues, artifacts, and summary
+7. publishes a task evidence comment with intent, plan, branch, commit SHA when committed, work performed, decisions, blockers, test results, remaining issues, artifacts, and summary
 
 ## Resume behavior
 

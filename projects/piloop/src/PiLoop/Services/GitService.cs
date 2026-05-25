@@ -60,6 +60,12 @@ public sealed class GitService
         return exitCode == 0;
     }
 
+    public async Task<string> GetHeadShaAsync() =>
+        (await RunCaptureAsync("rev-parse", "HEAD")).Trim();
+
+    public async Task<string> GetShortHeadShaAsync() =>
+        (await RunCaptureAsync("rev-parse", "--short", "HEAD")).Trim();
+
     /// <summary>
     /// Creates a stacked branch off a parent and checks it out.
     /// Worktree-safe: uses the parent's commit ref instead of checking out the parent branch
