@@ -137,8 +137,9 @@ public sealed class BuildLoop
         var changes = before.Diff(after);
         var validation = await RunValidationAsync();
 
-        if (commit && changes.Count > 0)
-            await CommitTaskAsync(task);
+        var gitCommit = commit && changes.Count > 0
+            ? await CommitTaskAsync(task)
+            : null;
 
         taskState.Status = validation.Passed ? Models.TaskStatus.Done : Models.TaskStatus.Failed;
         taskState.CompletedAt = DateTime.UtcNow.ToString("O");
@@ -147,7 +148,7 @@ public sealed class BuildLoop
 
         if (audit is not null && issueNumber > 0)
         {
-            var evidence = BuildTaskEvidence(task, workerResults, changes, validation);
+            var evidence = BuildTaskEvidence(task, state.Branch, gitCommit, workerResults, changes, validation);
             await audit.PublishEvidenceToTaskAsync(issueNumber, evidence);
         }
 
@@ -300,11 +301,12 @@ Your final JSON must make the work defensible. Include what you changed, why, al
         }
     }
 
-    private async Task CommitTaskAsync(PrdTask task)
+    private async Task<GitCommitInfo> CommitTaskAsync(PrdTask task)
     {
         var git = new GitService(_targetRoot.FullName);
         await git.RunAsync("add", ".");
         await git.RunAsync("commit", "-m", $"{task.Id}: {task.Title}");
+        return new GitCommitInfo(await git.GetHeadShaAsync(), await git.GetShortHeadShaAsync());
     }
 
     private static string[] GetBuilders(TaskType type) => type switch
@@ -315,9 +317,11 @@ Your final JSON must make the work defensible. Include what you changed, why, al
         _ => ["backend-builder"],
     };
 
-    private static EvidenceEvent BuildTaskEvidence(PrdTask task, IReadOnlyList<PiWorkerResult> results, IReadOnlyList<WorktreeChange> changes, ValidationResult validation)
+    private static EvidenceEvent BuildTaskEvidence(PrdTask task, string branch, GitCommitInfo? gitCommit, IReadOnlyList<PiWorkerResult> results, IReadOnlyList<WorktreeChange> changes, ValidationResult validation)
     {
         var work = results.Select(r => r.WhatHappened)
+            .Concat([$"Branch: {branch}"])
+            .Concat(gitCommit is null ? [] : [$"Commit: {gitCommit.ShortSha} ({gitCommit.Sha})"])
             .Concat(changes.Select(c => $"{c.Status.Trim()} {c.Path}"))
             .Where(x => !string.IsNullOrWhiteSpace(x))
             .ToArray();
@@ -345,7 +349,9 @@ Your final JSON must make the work defensible. Include what you changed, why, al
             "piloop-build",
             "Task implementation completed",
             $"Implement {task.Id}: {task.Title}.",
-            "Run Pi workers for tests and implementation, validate the repository, and commit the resulting changes.",
+            gitCommit is null
+                ? "Run Pi workers for tests and implementation, validate the repository, and record the resulting changes. No commit was created for this task."
+                : $"Run Pi workers for tests and implementation, validate the repository, and commit the resulting changes on branch {branch} at {gitCommit.ShortSha}.",
             work,
             decisions,
             blockers,
@@ -357,4 +363,5 @@ Your final JSON must make the work defensible. Include what you changed, why, al
     }
 
     private sealed record ValidationResult(bool Passed, string Summary, EvidenceTestResult[] TestResults);
+    private sealed record GitCommitInfo(string Sha, string ShortSha);
 }
