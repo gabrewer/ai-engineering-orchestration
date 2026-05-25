@@ -40,13 +40,17 @@ For each task, PiLoop:
 1. marks task execution as started in GitHub Issues when enabled
 2. runs `test-writer` unless `skipTests` is true
 3. runs `backend-builder`, `frontend-builder`, or both based on task type
-4. captures changed files with `git status`
-5. runs detected validation:
+4. runs validation as a build/test gate
+5. runs `destroyer` for adversarial review when validation passes
+6. runs `review-agent`
+7. reruns builders up to 3 review attempts when `review-agent` returns `changes_needed`
+8. captures changed files with `git status`
+9. runs detected validation:
    - `dotnet build/test` when a root `.sln` exists
    - `npm test` when `package.json` exists
    - otherwise records validation as skipped
-6. commits task changes unless `--no-commit` is specified
-7. publishes a task evidence comment with intent, plan, branch, commit SHA when committed, work performed, decisions, blockers, test results, remaining issues, artifacts, and summary
+10. commits task changes unless `--no-commit` is specified and validation/review passed
+11. publishes a task evidence comment with intent, plan, branch, commit SHA when committed, work performed, decisions, blockers, test results, remaining issues, artifacts, and summary
 
 ## Resume behavior
 
@@ -57,7 +61,7 @@ Tasks marked `failed`, `building`, `testing`, `destroying`, or `reviewing` are r
 ## Current limitations
 
 - This is the first Pi-native build extraction and intentionally simpler than the original TrakPomo loop.
-- It does not yet run domain-modeler, api-developer, destroyer, review-agent, or git-committer phases.
+- It does not yet run domain-modeler, api-developer, or git-committer phases.
 - It executes tasks sequentially rather than dependency waves.
 - It does not yet auto-fix failed validation.
 - Worktree resume currently starts a fresh worktree; use `--no-worktree --resume` to resume existing state in the target root.
