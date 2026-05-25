@@ -10,6 +10,7 @@ dotnet run --project projects/piloop/src/PiLoop -- build --target-root <repo> --
 dotnet run --project projects/piloop/src/PiLoop -- build --target-root <repo> --prd <sprint> --skip-github
 dotnet run --project projects/piloop/src/PiLoop -- build --target-root <repo> --prd <sprint> --no-commit
 dotnet run --project projects/piloop/src/PiLoop -- build --target-root <repo> --prd <sprint> --resume
+dotnet run --project projects/piloop/src/PiLoop -- build --target-root <repo> --prd <sprint> --no-worktree
 ```
 
 ## Branch safety
@@ -19,6 +20,18 @@ PiLoop build mode must not commit directly to `main` or `master`.
 By default, when started from `main` or `master`, PiLoop creates/uses `feature/<sprint>`. If a protected branch is explicitly requested with `--branch main` or `--branch master`, build mode fails before executing workers.
 
 PiLoop does not push branches automatically. Humans decide when to push and open a PR.
+
+## Worktree isolation
+
+By default, build mode creates a sibling worktree under `../wt/` and executes the sprint there. This keeps the target root clean while workers modify files and create task commits.
+
+Example worktree path:
+
+```text
+../wt/piloop-<sprint>-<timestamp>
+```
+
+Use `--no-worktree` only when you intentionally want workers to modify the target root directly.
 
 ## Current behavior
 
@@ -47,6 +60,6 @@ Tasks marked `failed`, `building`, `testing`, `destroying`, or `reviewing` are r
 - It does not yet run domain-modeler, api-developer, destroyer, review-agent, or git-committer phases.
 - It executes tasks sequentially rather than dependency waves.
 - It does not yet auto-fix failed validation.
-- It operates in the target root directly rather than creating an isolated worktree.
+- Worktree resume currently starts a fresh worktree; use `--no-worktree --resume` to resume existing state in the target root.
 
 These limitations are expected to be closed in later extraction passes.

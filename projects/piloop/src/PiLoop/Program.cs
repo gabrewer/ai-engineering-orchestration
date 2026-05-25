@@ -153,6 +153,10 @@ var buildResumeOption = new Option<bool>("--resume")
 {
     Description = "Resume existing .piloop state for the sprint and skip tasks already marked done."
 };
+var noWorktreeOption = new Option<bool>("--no-worktree")
+{
+    Description = "Run build mode directly in the target root instead of creating a sibling wt/ worktree."
+};
 
 var buildCommand = new Command("build", "Run the Pi-backed build loop for sprint task implementation.")
 {
@@ -162,6 +166,7 @@ var buildCommand = new Command("build", "Run the Pi-backed build loop for sprint
     buildBranchOption,
     noCommitOption,
     buildResumeOption,
+    noWorktreeOption,
     skipGitHubOption,
     piCommandOption,
     piProviderOption,
@@ -195,11 +200,21 @@ buildCommand.SetAction(async (result, ct) =>
         if (all)
         {
             foreach (var file in PrdReader.DiscoverAllSprintPlans())
-                await loop.ExecuteAsync(file, result.GetValue(buildBranchOption), commit: !result.GetValue(noCommitOption), resume: result.GetValue(buildResumeOption));
+                await loop.ExecuteAsync(
+                    file,
+                    result.GetValue(buildBranchOption),
+                    commit: !result.GetValue(noCommitOption),
+                    resume: result.GetValue(buildResumeOption),
+                    useWorktree: !result.GetValue(noWorktreeOption));
         }
         else
         {
-            await loop.ExecuteAsync(sprint!, result.GetValue(buildBranchOption), commit: !result.GetValue(noCommitOption), resume: result.GetValue(buildResumeOption));
+            await loop.ExecuteAsync(
+                sprint!,
+                result.GetValue(buildBranchOption),
+                commit: !result.GetValue(noCommitOption),
+                resume: result.GetValue(buildResumeOption),
+                useWorktree: !result.GetValue(noWorktreeOption));
         }
     }
     catch (Exception ex)

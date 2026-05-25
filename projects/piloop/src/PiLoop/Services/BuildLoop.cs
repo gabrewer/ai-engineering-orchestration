@@ -24,17 +24,24 @@ public sealed class BuildLoop
         _skillModelConfig = new SkillModelConfigService(targetRoot);
     }
 
-    public async Task ExecuteAsync(string sprintNameOrPath, string? branch = null, bool commit = true, bool resume = false)
+    public async Task ExecuteAsync(string sprintNameOrPath, string? branch = null, bool commit = true, bool resume = false, bool useWorktree = true)
     {
         StateManager.EnsureDotDir();
         var prd = await PrdReader.ReadAsync(sprintNameOrPath);
+
+        if (useWorktree)
+        {
+            await ExecuteInWorktreeAsync(sprintNameOrPath, prd, branch, commit, resume);
+            return;
+        }
+
         var runId = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
         ActivityLog.Init(runId);
         ActivityLog.Info($"Build loop started for {prd.Sprint}");
 
         var existingState = resume ? await StateManager.LoadStateAsync(prd.Sprint) : null;
         var git = new GitService(_targetRoot.FullName);
-        var requestedBranch = branch ?? existingState?.Branch;
+        var requestedBranch = branch ?? existingState?.Branch ?? $"feature/{prd.Sprint}";
         var targetBranch = await git.EnsureBranchAsync(requestedBranch, prd.Sprint);
         EnsureNotProtectedBranch(targetBranch);
         var state = existingState ?? StateManager.NewRunState(prd.Sprint, targetBranch);
@@ -82,6 +89,34 @@ public sealed class BuildLoop
 
         Console.WriteLine();
         AnsiConsole.MarkupLine("[green]  ✓[/]  Build loop complete.");
+    }
+
+    private async Task ExecuteInWorktreeAsync(string sprintNameOrPath, Prd prd, string? branch, bool commit, bool resume)
+    {
+        if (resume)
+            AnsiConsole.MarkupLine("[yellow]  --resume uses a fresh worktree unless --no-worktree is specified; existing completed state is not shared across worktrees.[/]");
+
+        var mainGit = new GitService(_targetRoot.FullName);
+        var baseBranch = await mainGit.GetCurrentBranchAsync();
+        var targetBranch = branch ?? $"feature/{prd.Sprint}";
+        EnsureNotProtectedBranch(targetBranch);
+
+        var worktreeName = $"piloop-{SanitizeForPath(prd.Sprint)}-{DateTime.UtcNow:yyyyMMdd-HHmmss}";
+        AnsiConsole.MarkupLine($"[rgb(99,102,241)]⬡[/]  [bold]Creating build worktree[/]");
+        AnsiConsole.MarkupLine($"[dim]  Base: {Markup.Escape(baseBranch)}[/]");
+        AnsiConsole.MarkupLine($"[dim]  Branch: {Markup.Escape(targetBranch)}[/]");
+        var worktreeGit = await mainGit.CreateWorktreeAsync(worktreeName, baseBranch);
+        AnsiConsole.MarkupLine($"[dim]  Worktree: {Markup.Escape(worktreeGit.WorkDir)}[/]");
+        Console.WriteLine();
+
+        var worktreeLoop = new BuildLoop(new DirectoryInfo(worktreeGit.WorkDir), _piRuntime, _publishGitHub);
+        await worktreeLoop.ExecuteAsync(sprintNameOrPath, targetBranch, commit, resume: false, useWorktree: false);
+    }
+
+    private static string SanitizeForPath(string value)
+    {
+        var chars = value.Select(ch => char.IsLetterOrDigit(ch) || ch is '-' or '_' ? ch : '-').ToArray();
+        return new string(chars).Trim('-');
     }
 
     private static void EnsureNotProtectedBranch(string branch)
