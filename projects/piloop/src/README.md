@@ -28,6 +28,6 @@ dotnet run --project projects/piloop/src/PiLoop -- build --target-root <repo> --
 
 When rerunning against an existing sprint epic, PiLoop reuses known issues and does not create issues for newly generated task IDs unless `--allow-new-issues` is specified.
 
-`build` creates a sibling `wt/` worktree by default, runs Pi workers for sprint tasks, runs validation, destroyer, and review-agent with a bounded fix loop, captures changed files, commits each verified task by default, and publishes task-level evidence comments with branch/commit SHA when GitHub is enabled. Build mode refuses to commit directly to `main` or `master`; use feature branches and PRs. Use `--no-worktree` only for intentional in-place runs.
+`build` creates a sibling `wt/` worktree by default, runs sprint-level domain/API phases when enabled, runs Pi workers for sprint tasks, runs validation, destroyer, and review-agent with a bounded fix loop, captures changed files, commits each verified task by default, and publishes task-level evidence comments with branch/commit SHA when GitHub is enabled. Build mode refuses to commit directly to `main` or `master`; use feature branches and PRs. Use `--no-worktree` only for intentional in-place runs.
 
 Model selection uses explicit CLI overrides first, then `.pi/skill-models.json`, then prompt frontmatter `model:`, then Pi defaults. The installed Pi extension uses the same `.pi/skill-models.json` for interactive slash-command routing.
