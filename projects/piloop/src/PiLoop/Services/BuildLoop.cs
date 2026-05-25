@@ -36,6 +36,7 @@ public sealed class BuildLoop
         var git = new GitService(_targetRoot.FullName);
         var requestedBranch = branch ?? existingState?.Branch;
         var targetBranch = await git.EnsureBranchAsync(requestedBranch, prd.Sprint);
+        EnsureNotProtectedBranch(targetBranch);
         var state = existingState ?? StateManager.NewRunState(prd.Sprint, targetBranch);
         state.Branch = targetBranch;
         await StateManager.SaveStateAsync(state);
@@ -81,6 +82,12 @@ public sealed class BuildLoop
 
         Console.WriteLine();
         AnsiConsole.MarkupLine("[green]  ✓[/]  Build loop complete.");
+    }
+
+    private static void EnsureNotProtectedBranch(string branch)
+    {
+        if (branch is "main" or "master")
+            throw new InvalidOperationException("PiLoop build mode will not commit directly to main/master. Use a feature branch, e.g. --branch feature/<sprint>.");
     }
 
     private async Task EnsureGitHubIssuesAsync(Prd prd, RunState state, string branch, bool reuseExistingState)

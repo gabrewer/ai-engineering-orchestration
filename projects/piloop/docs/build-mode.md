@@ -12,6 +12,14 @@ dotnet run --project projects/piloop/src/PiLoop -- build --target-root <repo> --
 dotnet run --project projects/piloop/src/PiLoop -- build --target-root <repo> --prd <sprint> --resume
 ```
 
+## Branch safety
+
+PiLoop build mode must not commit directly to `main` or `master`.
+
+By default, when started from `main` or `master`, PiLoop creates/uses `feature/<sprint>`. If a protected branch is explicitly requested with `--branch main` or `--branch master`, build mode fails before executing workers.
+
+PiLoop does not push branches automatically. Humans decide when to push and open a PR.
+
 ## Current behavior
 
 For each task, PiLoop:
