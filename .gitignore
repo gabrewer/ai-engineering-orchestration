@@ -1,0 +1,5 @@
+# agentloop runtime and temporary state-backend drafts
+.agentloop/tmp/
+.agentloop/logs/
+.agentloop/state-*.json
+.agentloop/pi-sessions/

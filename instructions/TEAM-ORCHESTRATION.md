@@ -36,8 +36,8 @@ Expands milestones into detailed sprint briefs.
 - Reads the master PRD and expands every milestone into concrete requirements
 - Defines user stories, screen descriptions, interaction details, and edge cases
 - Makes UX decisions — doesn't leave ambiguity for the PM
-- Writes sprint briefs to `docs/sprints/<sprint-name>-brief.md`
-- If ambiguity can't be resolved, writes questions to `docs/sprints/questions.md`
+- Writes durable sprint briefs to `docs/sprints/<sprint-name>-brief.md` when the brief is a product/design deliverable; otherwise records planning output in the selected state backend
+- If ambiguity can't be resolved, posts questions to the selected state backend using the 🧭 planning status
 - **Tools**: Read, Write, Edit, Glob, Grep, Bash
 - **Model**: Opus
 
@@ -47,9 +47,10 @@ Turns sprint briefs into actionable sprint plans.
 
 - Reads sprint briefs (from Product Designer) and produces structured sprint JSON files
 - Each Task is either **prescriptive** (specific implementation instructions) or **goal-oriented** (desired outcome, agent decides approach)
-- Writes sprint plans to `docs/sprints/<sprint-name>-<timestamp>.json`
-- If briefs have unresolved ambiguity, appends questions to `docs/sprints/questions.md`
-- Also writes sprint summaries after build loop execution completes
+- Writes machine-readable sprint plans to `docs/sprints/<sprint-name>-<timestamp>.json` only when agentloop requires a local plan input; execution state lives in the selected backend
+- Creates or updates the selected state backend with the human-readable task board, Contract Impact Check, dependencies, and Quality Gates
+- If briefs have unresolved ambiguity, records the specific questions in the selected state backend and marks the sprint blocked/needs-input
+- Posts sprint summaries to the selected state backend after build loop execution completes
 - **Tools**: Read, Write, Glob, Grep, Bash
 
 ### `domain-modeler`
@@ -118,7 +119,7 @@ Stress-tests completed work. The adversarial half of the immune system.
 - Reviews code for correctness, security, edge cases, and adherence to the domain model and API contract
 - Writes adversarial tests — but **only for code this task created or modified**. Never writes tests for pre-existing code or out-of-scope behavior — those tests fail permanently and poison subsequent tasks.
 - Only reports **critical** and **high** severity findings as actionable. Medium and low go in a non-blocking notes section that the review-agent cannot route to builders.
-- Does NOT fix issues — reports them to the Review Agent
+- Does NOT fix issues — reports them to the Review Agent via `## 🔥 Destroy Report: ...` in the selected state backend
 - Leaves breadcrumbs documenting what was tested, what survived, and what broke
 - **Scope boundary**: starts with files explicitly listed in the task description. Only expands to related files if a finding requires broader context. Does not grep or glob across the entire codebase. Does not re-report issues that are clearly pre-existing in other tasks' code.
 - **Most tasks should produce CLEAN or one high finding.** Quantity of findings does not equal quality — flag at most one issue per category.
@@ -132,7 +133,7 @@ Triages destroyer findings and drives resolution.
 - Routes issues to the appropriate builder for fixes
 - Verifies fixes after builders address them
 - Applies the escalation threshold: small issues (style, naming, minor refactors) get auto-resolved; big issues (architectural concerns, security, fundamental approach problems) get escalated to the human
-- Leaves breadcrumbs documenting the triage decision and resolution for every issue
+- Posts `## 👀 Review Report: ...` reports to the selected state backend and leaves breadcrumbs documenting the triage decision and resolution for every issue
 - **Pre-existing bugs are not this task's responsibility.** If a finding is in code not written or modified by this task, the review-agent marks it `DEFERRED` and does not route it to the builder. It ships unless the pre-existing bug actively breaks this task's own work (security issue or domain model violation). Deferred findings are noted for a future task to own.
 - **Output**: Emits exactly one of:
   - `SHIP IT` — all issues resolved or acceptably low risk
@@ -148,29 +149,149 @@ Commits all task work after the review agent approves.
 - Triggered automatically by agentloop after `SHIP IT`
 - **Tools**: Read, Glob, Grep, Bash
 
-Logs for all agents are written to `.agentloop/logs/` keyed by run ID, task ID, and agent name.
+Logs for all agents are written to `.agentloop/logs/` keyed by run ID, task ID, and agent name. Logs are diagnostic traces; the selected state backend remains the durable source of truth for sprint/task state.
 
 ---
 
-## GitHub Process
+## State Tracking Backend
 
-GitHub is the **source of truth**. All state is tracked there in real time — not in batches. All `gh` CLI calls use the `gh` tool.
+The **user specifies** one durable state backend before planning begins:
 
-- Every feature has a **feature branch**
-- Every feature has a **parent (epic) issue** with tasks grouped into steps
-- Every task has its own **child issue**
-- Every task has an **emoji status indicator** (see key below)
+1. **GitHub Issues mode** — use when the user asks for GitHub-backed planning/tracking, issue comments, or remote team auditability.
+2. **Filesystem mode** — use when the user asks for local files, markdown/JSON plans, offline/private tracking, or no GitHub dependency.
+
+Do **not** choose or infer the backend autonomously. If the user has not specified `github-issues` or `filesystem`, ask which backend to use before creating planning artifacts.
+
+The user-selected backend is the **source of truth** for execution state. All sprint/task progress, agent updates, adversarial findings, review verdicts, test reports, decisions, and completion summaries are tracked there in real time — not in batches.
+
+Record the user's choice in the plan header, sprint file, or epic issue:
+
+```markdown
+**State backend:** github-issues | filesystem
+```
+
+### GitHub Issues Mode
+
+- All `gh` CLI calls use the `gh` tool.
+- Every feature has a **feature branch**.
+- Every feature has a **parent (epic) issue** with tasks grouped into steps.
+- Every task has its own **child issue**, unless the project intentionally uses a single sprint issue with an embedded task checklist.
+- Every task has an **emoji status indicator** (see key below).
+- Routine progress artifacts are **GitHub issue comments**, not new files under `docs/sprints/`, `docs/reviews/`, or `docs/reports/`.
+- Durable product, architecture, migration, or API documentation may still live under `docs/` when it is a real deliverable rather than sprint status.
+
+### Filesystem Mode
+
+Use repo-local markdown/JSON files as the durable state backend:
+
+```text
+docs/sprints/<sprint-id>.md          # sprint plan, task board, decisions, quality gates
+docs/reviews/<sprint-id>-r<N>.md     # reviewer reports
+docs/reviews/<sprint-id>-destroy-r<N>.md
+docs/reports/<sprint-id>-test-r<N>.md
+docs/sprints/<sprint-id>-build.md    # running agent updates / completion summary
+```
+
+In filesystem mode, agents append progress to the sprint build log and write quality-gate reports to the paths above. Do not also mirror every update into GitHub Issues unless the human explicitly asks for dual tracking.
+
+### Sprint/Epic Structure
+
+Use this structure for a GitHub epic/sprint issue or a filesystem sprint markdown file so any agent can resume without local context:
+
+```markdown
+## 🧭 Sprint: <sprint-or-feature-id>
+
+**Status:** 🧭 planning | 🧱 ready | 🚧 in progress | 👀 review | 🧪 testing | ✅ done | ❌ blocked
+**Goal:** <one paragraph>
+**Owner / lead:** team-lead
+**Design spec(s):** <paths/links or n/a>
+**Related PR(s):** <links or n/a>
+
+## 🎯 Scope
+
+### In scope
+- ...
+
+### Out of scope
+- ...
+
+## 🔎 Contract Impact Check
+- UI only? yes/no
+- Existing typed API contract sufficient? yes/no with file paths
+- New request/response fields needed? yes/no
+- Server-side validation/auth/ownership needed? yes/no
+- Persistence/metadata needed? yes/no
+- Backend/API tests needed? yes/no
+- Runtime/browser validation needed? yes/no
+
+## 🧩 Task Board
+- [ ] 🧱 **TASK-001: <title>** — `<agent>` — blocked by: none
+  - **Description:** ...
+  - **Files to read:** ...
+  - **Acceptance:** ...
+  - **Verification:** `...`
+  - **Commit hint:** `...`
+
+## 👀 Quality Gates
+- [ ] 🔥 Destroyer round 1 complete
+- [ ] 👀 Reviewer round 1 PASS
+- [ ] 🧪 Tester/smoke round 1 PASS
+
+## 🔗 Durable docs / artifacts
+- ...
+
+## 🧾 Decision log
+- <date> — <decision> — <reason>
+```
 
 ### Task Status Key
 
 | Emoji | Status |
 |-------|--------|
-| 🏃 | doing |
-| ✋ | blocked |
+| 🧭 | planning / contract analysis |
+| 🧱 | ready / unblocked |
+| 🏃 / 🚧 | doing |
+| ✋ / ❌ | blocked or failed gate |
 | 🔴 | on hold |
 | 🔵 | more investigation required |
-| 👀 | human review required |
-| ✅ | done |
+| 👀 | review or human review required |
+| 🧪 | testing / verification |
+| 🔥 | adversarial testing / destroyer |
+| 🧯 | remediation |
+| ✅ | done / pass |
+| 🚀 | shipped / complete |
+| 💤 | deferred |
+
+### Agent Progress Protocol
+
+Agents write stable, searchable updates to the selected state backend.
+
+- **GitHub Issues mode:** post comments to the relevant task/epic issue. Compose long comments in temporary untracked files such as `.agentloop/tmp/<task-id>-comment.md`, then post them with `gh issue comment <issue> --body-file <file>`. Never commit these temporary files.
+- **Filesystem mode:** append the same markdown blocks to `docs/sprints/<sprint-id>-build.md`. Write destroy/review/test reports to the paths listed in Filesystem Mode.
+
+Use this format for task progress in either backend:
+
+```markdown
+## <emoji> Agent Update: <agent-name> — <task-id> — Round <N>
+
+**Status:** 🧭 planning | 🧱 ready | 🚧 in progress | ✅ completed | ❌ blocked | ⚠️ warning
+**Commit(s):** <sha/link or n/a>
+**Summary:** <what changed or was decided>
+**Verification:** <commands/results or n/a>
+**Findings:** <blockers/warnings/notes or n/a>
+**Next:** <next owner/action>
+```
+
+Use these quality-gate headings exactly:
+
+- `## 🔥 Destroy Report: <sprint-or-task-id> Round <N>`
+- `## 👀 Review Report: <sprint-or-task-id> Round <N>`
+- `## 🧪 Test Report: <sprint-or-task-id> Round <N>`
+- `## 🚀 Sprint Complete: <sprint-or-feature-id>`
+
+### Quality Gates Are Not Task-Board Work
+
+Destroyer, review-agent, and final tester/smoke phases are mandatory orchestration phases, not ordinary build tasks. Do not duplicate them as child issues or task-board checklist items unless a project explicitly needs a custom test-harness build task. Track them in a `Quality Gates` section of the parent issue/sprint file and via the standard reports above.
 
 ---
 
@@ -185,15 +306,34 @@ GitHub is the **source of truth**. All state is tracked there in real time — n
 
 ## Task Definition
 
-Each Task in the Sprint plan includes:
+Each Task in the Sprint plan or selected-backend task board includes:
 
 - **Name** — short, descriptive
 - **Type** — prescriptive or goal-oriented
 - **Description** — what needs to be done (prescriptive: specific instructions; goal-oriented: desired outcome)
+- **Files to read** — exact source, test, and documentation paths the agent must inspect before coding
 - **Acceptance criteria** — how to know it's done
+- **Verification** — exact deterministic commands to run
 - **Dependencies** — which Tasks must complete first
 - **Sprint** — which Sprint it belongs to
 - **Assigned to** — which builder agent owns it
+- **Commit hint** — conventional commit message for the smallest coherent change
+
+### Contract Impact Check
+
+Every product sprint starts with a Contract Impact Check in the parent issue or sprint file. Treat user-visible workflow changes as full-stack by default unless explicitly marked `UI polish only`, `docs only`, or `frontend prototype only`.
+
+The check answers:
+
+- UI only? yes/no
+- Existing typed API contract sufficient? yes/no, with file paths
+- New request/response fields needed? yes/no
+- Server-side validation/auth/ownership needed? yes/no
+- Persistence/metadata needed? yes/no
+- Backend/API tests needed? yes/no
+- Runtime/browser validation needed? yes/no
+
+If any backend/API/persistence answer is `yes`, the plan must include backend/API/test work before frontend wiring. Do not make production behavior work by tunneling structured state through free-text fields such as `notes`, `description`, or `metadataJson` when a typed contract is required.
 
 ---
 
@@ -204,7 +344,7 @@ Two separate loops with a human review gate between them:
 ```
 PLANNING LOOP (interactive, daytime):
   product-designer → pm → questions? → human answers → re-run
-  Output: docs/sprints/<sprint>.json for each milestone
+  Output: selected state backend (GitHub issues or docs/sprints files) + optional docs/sprints/<sprint>.json machine plan
 
   ↓ human reviews plans ↓
 
@@ -295,14 +435,19 @@ Once the user approves the plan, the skill runs a **preflight check** before cre
 Once the user approves the plan:
 
 - Create a **feature branch** locally
-- Create a **plan document** at `/docs/plans/<feature-name>.md`
-- Create an **epic issue** on GitHub with tasks grouped into second-level headers with emoji
-  - Every task has its status emoji (start with 🏃 for the first task, rest unlabeled)
-  - Every task has its own child issue
-  - Every issue has appropriate labels applied
+- Confirm the user-specified **state backend**: GitHub Issues or filesystem. If absent, ask before proceeding.
+- Create a **plan document** at `/docs/plans/<feature-name>.md` only if the plan is a durable deliverable.
+- Create the authoritative sprint/epic record in the user-selected backend:
+  - **GitHub Issues mode:** create an epic issue with tasks grouped into second-level headers with emoji.
+  - **Filesystem mode:** create `docs/sprints/<sprint-id>.md` using the same structure.
+  - Include a Contract Impact Check before the task board.
+  - Include a `Quality Gates` section for destroyer, review, and test/smoke gates.
+  - Every task has its status emoji (start with 🏃/🚧 for the first task, rest 🧱 ready).
+  - In GitHub mode, every task has its own child issue unless the project intentionally uses one sprint issue with embedded checklist tasks.
+  - In GitHub mode, every issue has appropriate labels applied.
 - Create **verification scripts** at `verify/<feature-name>/` — one shell script per task that needs verification, named by task ID (e.g., `verify/user-auth/task-003.sh`).
-- Create `task-issues.json` — a mapping of task IDs to GitHub issue numbers (e.g., `{"task-001": 42, "task-002": 43}`).
-- Commit everything: plan doc, verification scripts, and any other local artifacts
+- In GitHub mode, create `task-issues.json` — a mapping of task IDs to GitHub issue numbers (e.g., `{"task-001": 42, "task-002": 43}`). In filesystem mode, omit it or map task IDs to sprint-file anchors.
+- Commit durable artifacts only: plan docs that should survive, filesystem sprint files, verification scripts, task mapping, and configuration. Do not commit temporary issue-body/comment files.
 
 ---
 
@@ -310,33 +455,33 @@ Once the user approves the plan:
 
 This phase is kicked off when the user says "execute the plan" or equivalent. The AI runs the `agentloop` CLI from the project root and monitors progress.
 
-### Real-time GitHub issue title updates
+### Real-time status updates
 
-The main AI session is responsible for updating issue titles at key moments — **before** launching agentloop, not after.
+The main AI session is responsible for updating task status in the selected backend at key moments — **before** launching agentloop, not after.
 
-**When starting a task** (before launching agentloop):
+**GitHub Issues mode** updates issue titles/comments:
+
 ```bash
-# Read current title, strip any existing emoji, prepend 🏃
+# When starting a task: read current title, strip any existing emoji, prepend 🏃
 CURRENT=$(gh issue view <issue-number> --json title -q .title)
 gh issue edit <issue-number> --title "🏃 $CURRENT"
-```
 
-**When a builder outputs `BLOCKED:`** (hard stop, task not completed):
-```bash
+# When blocked: strip emoji prefix first, then add ✋ and comment
 CURRENT=$(gh issue view <issue-number> --json title -q .title)
-# Strip emoji prefix first, then add ✋
 CLEAN=$(echo "$CURRENT" | sed 's/^[^ ]* //')
 gh issue edit <issue-number> --title "✋ $CLEAN"
 gh issue comment <issue-number> --body "✋ Blocked: <reason from builder output>"
 ```
 
-**When the destroyer flags an issue for escalation**:
-```bash
-CURRENT=$(gh issue view <issue-number> --json title -q .title)
-CLEAN=$(echo "$CURRENT" | sed 's/^[^ ]* //')
-gh issue edit <issue-number> --title "👀 $CLEAN"
-gh issue comment <issue-number> --body "👀 Escalated: <reason from review-agent output>"
+**Filesystem mode** updates the sprint file/checklist and appends an agent update to the build log:
+
+```markdown
+- [ ] ✋ **TASK-003: <title>** — `<agent>` — blocked by: <reason>
 ```
+
+Append details to `docs/sprints/<sprint-id>-build.md` using the Agent Progress Protocol.
+
+When the destroyer or review-agent escalates, mark the task/gate `👀` in the selected backend and record the reason using the standard report/comment format.
 
 ### The per-Sprint pipeline
 
@@ -372,7 +517,7 @@ After all tasks complete (before the PM summary), agentloop runs a sprint-level 
 
 If the build fails, the sprint is flagged and the PM summary still runs (so there's a written record), but the failure is surfaced clearly. **A sprint is not considered done unless the smoke test passes.**
 
-The script exits `0` on success or non-zero on failure. Failure stops the pipeline and updates the GitHub issue to ✋ (blocked), requiring human review.
+The script exits `0` on success or non-zero on failure. Failure stops the pipeline and updates the selected state backend to ✋/❌ (blocked), requiring human review.
 
 ---
 
@@ -386,11 +531,15 @@ The Refinement step is a **human-in-the-loop handoff**. After execution complete
 
 This is not an automated step. The user decides what happens next.
 
-A final **report** is posted as a comment on the epic GitHub issue summarizing:
+A final **report** is recorded in the selected state backend using `## 🚀 Sprint Complete: <sprint-or-feature-id>` and summarizing:
 - What was built
 - What was verified and how
+- Commit/PR links
 - Any decisions made or tradeoffs taken
+- Open warnings, deferred work, or accepted risks
 - What to watch for in production
+
+The feature is not complete until the final completion record exists. In GitHub mode, the epic issue must be closed or labeled done according to repository practice. In filesystem mode, the sprint file status must be `✅ done` and the completion report must be present.
 
 ---
 
@@ -440,12 +589,15 @@ Trust level is configured by the human and informed by breadcrumb review. Readin
 | Artifact | Location | Created by |
 |----------|----------|------------|
 | Master PRD | `docs/PRD.md` | Brainstorming skill |
-| Sprint briefs | `docs/sprints/<sprint>-brief.md` | Product Designer (plan loop) |
-| Questions | `docs/sprints/questions.md` | Product Designer / PM (plan loop) |
-| Answers | `docs/sprints/answers.md` | Human |
-| Sprint plans | `docs/sprints/<sprint>.json` | PM (plan loop) |
-| Domain model | `docs/domain/<sprint>.md` | Domain Modeler (build loop) |
-| API contract | `docs/api/<sprint>.md` | API Developer (build loop) |
+| Sprint briefs | `docs/sprints/<sprint>-brief.md`, GitHub issue body, or sprint file | Product Designer (plan loop) |
+| Questions | Selected state backend; optionally `docs/sprints/questions.md` for durable planning docs | Product Designer / PM (plan loop) |
+| Answers | Selected state backend; optionally `docs/sprints/answers.md` | Human |
+| Sprint plans | `docs/sprints/<sprint>.json` when agentloop needs local machine-readable input | PM (plan loop) |
+| Execution state | GitHub issue body/comments or `docs/sprints/<sprint-id>.md` + build log | Team Lead + all agents |
+| Destroy/review/test reports | GitHub issue comments or `docs/reviews/` / `docs/reports/` files | Destroyer / Review Agent / Tester |
+| Temporary issue bodies/comments | `.agentloop/tmp/` or tool-specific temp directory, untracked | Team Lead + agents |
+| Domain model | `docs/domain/<sprint>.md` when durable architecture output is required | Domain Modeler (build loop) |
+| API contract | `docs/api/<sprint>.md` when durable contract docs are required | API Developer (build loop) |
 | Agent definitions | `agents/` | Setup (one-time) — see `TOOL-*.md` for format |
 | agentloop CLI | `tools/agentloop/` | Setup (one-time) |
 | Run logs | `.agentloop/logs/` | Build loop |
