@@ -9,7 +9,8 @@ This file describes how to configure agentloop for use with **opencode** — the
 ```
 opencode.json       # Primary opencode configuration (agents defined here)
 verify/             # Verification scripts (one subdirectory per feature)
-task-issues.json    # Task ID → GitHub issue number mapping
+.agentloop/tmp/     # Temporary GitHub issue bodies/comments; never committed
+task-issues.json    # Task ID → GitHub issue number mapping (GitHub mode only)
 ```
 
 opencode uses a central JSON configuration file rather than per-agent markdown files.
@@ -104,3 +105,4 @@ Configure the invocation command and agent name mapping in agentloop's tool conf
 - opencode's permission system (`Ask`/`Allow`/`Deny` per action) should be configured to allow unattended execution for subagents used in the build loop.
 - The `task-issues.json` file is created during brainstorming and lives at the project root.
 - Model provider keys (e.g., `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`) must be set in your environment before running agentloop.
+- Follow `TEAM-ORCHESTRATION.md`: the user specifies either GitHub Issues mode or filesystem mode as the state backend. Do not choose autonomously. In GitHub mode, post progress and reports as issue comments and use `.agentloop/tmp/` for `gh --body-file` drafts. In filesystem mode, write the same updates to `docs/sprints/`, `docs/reviews/`, and `docs/reports/`.

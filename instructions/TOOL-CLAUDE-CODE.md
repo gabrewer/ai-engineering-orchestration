@@ -11,7 +11,9 @@ This file describes how to configure agentloop for use with **Claude Code**.
   agents/           # Agent definition files (one .md per agent)
   skills/           # Reusable skill definitions (e.g., brainstorming.md)
   verify/           # Verification scripts (one subdirectory per feature)
-task-issues.json    # Task ID → GitHub issue number mapping
+.agentloop/
+  tmp/              # Temporary GitHub issue bodies/comments; never committed
+task-issues.json    # Task ID → GitHub issue number mapping (GitHub mode only)
 ```
 
 ---
@@ -72,3 +74,4 @@ The `--allowedTools` flag corresponds to the `tools` list in the agent's YAML fr
 
 - Agent files must be in `.claude/agents/` — subdirectories are not supported.
 - The `task-issues.json` file is created during brainstorming and lives at the project root.
+- Follow `TEAM-ORCHESTRATION.md`: the user specifies either GitHub Issues mode or filesystem mode as the state backend. Do not choose autonomously. In GitHub mode, post progress and reports as issue comments and use `.agentloop/tmp/` for `gh --body-file` drafts. In filesystem mode, write the same updates to `docs/sprints/`, `docs/reviews/`, and `docs/reports/`.

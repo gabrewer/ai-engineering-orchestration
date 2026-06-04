@@ -11,8 +11,11 @@ This file describes how to configure agentloop for use with **GitHub Copilot** (
   agents/                   # Agent definition files (one .agent.md per agent)
   instructions/             # Shared instruction files (.instructions.md)
   copilot-instructions.md   # Global repo-wide Copilot instructions
+.agents/
+  skills/                   # Shared Agent Skills packages (directories with SKILL.md)
 verify/                     # Verification scripts (one subdirectory per feature)
-task-issues.json            # Task ID → GitHub issue number mapping
+.agentloop/tmp/             # Temporary GitHub issue bodies/comments; never committed
+task-issues.json            # Task ID → GitHub issue number mapping (GitHub mode only)
 ```
 
 ---
@@ -50,7 +53,8 @@ Tool access is controlled via Copilot settings and the agent description — the
 
 - **Global instructions**: `.github/copilot-instructions.md` — applies to all Copilot interactions in the repo.
 - **Task-specific instructions**: `.github/instructions/<name>.instructions.md` — scoped instructions for specific file patterns or workflows.
-- **Brainstorming skill**: `.github/instructions/brainstorming.instructions.md`
+- **Agent Skills**: `.agents/skills/<skill-name>/SKILL.md` — shared skill packages using the Agent Skills `SKILL.md` format.
+- **Brainstorming skill**: `.agents/skills/brainstorming/SKILL.md`
 
 ---
 
@@ -75,5 +79,7 @@ Or programmatically via the GitHub Copilot CLI or VS Code extension API. Configu
 ## Notes
 
 - Agent files must be placed directly in `.github/agents/` — subdirectories are not recognized.
+- Agent Skills live under `.agents/skills/<skill-name>/SKILL.md`; each skill should be a directory containing `SKILL.md` and any supporting references/scripts/assets.
 - The `task-issues.json` file is created during brainstorming and lives at the project root.
 - Copilot's coding agent can be assigned tasks directly via GitHub Issues (assign the issue to `@copilot`), which is an alternative to agentloop-driven invocation.
+- Follow `TEAM-ORCHESTRATION.md`: the user specifies either GitHub Issues mode or filesystem mode as the state backend. Do not choose autonomously. In GitHub mode, post progress and reports as issue comments and use `.agentloop/tmp/` for `gh --body-file` drafts. In filesystem mode, write the same updates to `docs/sprints/`, `docs/reviews/`, and `docs/reports/`.
