@@ -52,21 +52,59 @@ The file should capture:
 
 ### Step 3 — Install only required project-local assets
 For an existing repo, PiLoop should add only what is needed:
-- `.pi/prompts/`
-- `.agents/skills/`
+- `AGENTS.md` if no repo-level Pi context file exists, or a small Pi/PiLoop section appended to the existing project instructions
+- `.pi/prompts/` for human-facing slash commands such as `/pm-agent` and `/team-lead`
+- `.agents/skills/` for Pi worker agents (`product-designer`, `pm`, `domain-modeler`, `api-developer`, `test-writer`, `backend-builder`, `frontend-builder`, `destroyer`, `review-agent`, `git-committer`)
 - docs folders if missing
 - runtime state/log ignore rules if needed
 
+Use `.agents/skills/` for worker agents by default because Pi discovers it and the files remain portable to other Agent Skills-compatible tools. Use `.pi/skills/` only for Pi-specific skills.
+
 Do not replace existing repo structure just to match a template.
+
+The minimum useful install looks like:
+
+```text
+AGENTS.md
+.pi/prompts/pm-agent.md
+.pi/prompts/team-lead.md
+.agents/skills/<agent-name>/SKILL.md
+.agentloop/tmp/        # ignored
+.agentloop/logs/       # ignored
+.agentloop/state-*.json # ignored
+```
+
+Each `SKILL.md` must include Pi-compatible Agent Skills frontmatter:
+
+```markdown
+---
+name: backend-builder
+description: Builds backend code for one assigned task in this repository. Use when implementing server-side changes from a PiLoop task.
+---
+```
+
+Validate discovery before using the agents for real work:
+
+```bash
+pi --no-extensions --tools read,grep,find,ls -p "List the available project skills and prompt templates. Do not edit files."
+```
 
 ### Step 4 — Generate prompts from project context
 Existing projects should not rely on generic prompts for long.
 
 PiLoop should use the repo's orchestration instructions to generate or refine:
 - planning prompts
+- team-lead/build-loop prompts
 - builder prompts
 - review prompts
 - scope-boundary prompts
+
+Minimum Pi prompt set:
+
+- `.pi/prompts/pm-agent.md` — reads the design/spec, audits relevant source and tests, performs the Contract Impact Check, avoids duplicate issues, and creates/updates the authoritative sprint issue/file.
+- `.pi/prompts/team-lead.md` — reads the sprint issue/file and comments, loads worker skills by path for each phase, posts agent updates, runs destroyer/reviewer/tester as mandatory gates, auto-remediates blockers within thresholds, posts the final completion matrix, and prepares a Ready for Acceptance Verification checklist derived from the original source-of-truth.
+
+Generated prompts should be specific enough to name repo standards, exact source areas, verification commands, temp-file locations, quality-gate headings, and escalation thresholds.
 
 ### Step 5 — Create or select the PRD
 For a new initiative in an existing repo, use Pi discovery skills such as `/inspire` and `/brainstorm`, then write or refine the PRD under `docs/`.
@@ -107,7 +145,7 @@ PiLoop should eventually automate:
 - `TEAM-ORCHESTRATION.md` bootstrap/refinement
 - prompt/skill generation from current repo context
 - planning-mode installation verification
-- GitHub label and issue model setup
+- GitHub label and issue model setup, excluding final disposition labels like `done`, `complete`, or `shipped` unless a human applies them outside PiLoop automation
 
 ## Design principle
 
