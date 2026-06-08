@@ -175,10 +175,11 @@ Record the user's choice in the plan header, sprint file, or epic issue:
 - All `gh` CLI calls use the `gh` tool.
 - Every feature has a **feature branch**.
 - Every feature has a **parent (epic) issue** with tasks grouped into steps.
-- Every task has its own **child issue**, unless the project intentionally uses a single sprint issue with an embedded task checklist.
+- Every task has its own **child issue**, unless the project intentionally uses a single sprint issue with an embedded checklist.
 - Every task has an **emoji status indicator** (see key below).
 - Routine progress artifacts are **GitHub issue comments**, not new files under `docs/sprints/`, `docs/reviews/`, or `docs/reports/`.
 - Durable product, architecture, migration, or API documentation may still live under `docs/` when it is a real deliverable rather than sprint status.
+- **Never close GitHub issues. Never apply final completion/disposition labels such as `done`, `complete`, or `shipped`.** Agents may only post final summary / ready-for-human-disposition comments and update non-final progress markers in the issue body/title when requested by the workflow.
 
 ### Filesystem Mode
 
@@ -220,6 +221,7 @@ Use this structure for a GitHub epic/sprint issue or a filesystem sprint markdow
 - Existing typed API contract sufficient? yes/no with file paths
 - New request/response fields needed? yes/no
 - Server-side validation/auth/ownership needed? yes/no
+- Cross-entity IDs or durable linkage introduced? yes/no, with write-side validation plan
 - Persistence/metadata needed? yes/no
 - Backend/API tests needed? yes/no
 - Runtime/browser validation needed? yes/no
@@ -259,7 +261,7 @@ Use this structure for a GitHub epic/sprint issue or a filesystem sprint markdow
 | 🔥 | adversarial testing / destroyer |
 | 🧯 | remediation |
 | ✅ | done / pass |
-| 🚀 | shipped / complete |
+| 🚀 | final summary posted / ready for human disposition |
 | 💤 | deferred |
 
 ### Agent Progress Protocol
@@ -288,10 +290,24 @@ Use these quality-gate headings exactly:
 - `## 👀 Review Report: <sprint-or-task-id> Round <N>`
 - `## 🧪 Test Report: <sprint-or-task-id> Round <N>`
 - `## 🚀 Sprint Complete: <sprint-or-feature-id>`
+- `## 🧑‍⚖️ Ready for Acceptance Verification: <sprint-or-feature-id>`
 
 ### Quality Gates Are Not Task-Board Work
 
 Destroyer, review-agent, and final tester/smoke phases are mandatory orchestration phases, not ordinary build tasks. Do not duplicate them as child issues or task-board checklist items unless a project explicitly needs a custom test-harness build task. Track them in a `Quality Gates` section of the parent issue/sprint file and via the standard reports above.
+
+### Lesson learned: high-quality sprint control issue
+
+For large parity, migration, or multi-workstream features, prefer a single umbrella/control issue when the human wants cohesive execution instead of issue sprawl. The control issue should contain or link all of the following before implementation starts:
+
+1. **Source delta audit** — a matrix comparing reference behavior to current behavior with exact source paths/line references, status (`implemented`, `gap`, `accepted deviation`, `blocked`), and required fix.
+2. **Implementation-ready workstreams** — grouped batches with files to keep open, backend contract tasks, frontend tasks, test tasks, and final verification commands.
+3. **Contract Impact Check** — full-stack by default; typed API/backend/persistence/auth/test work appears before frontend wiring whenever production behavior changes.
+4. **Decision gate** — explicit human/product decisions for intentional deviations, extensions, or deferrals before coding begins.
+5. **Quality gate comments** — destroyer, reviewer, and tester reports posted as comments with round numbers, blockers/warnings, and remediation evidence.
+6. **Final matrix** — every audit row resolved as implemented, accepted deviation, or blocked, with source evidence and test/browser/runtime evidence.
+
+Do not report completion from the team-lead until the final control issue/file has commits, verification commands/results, quality-gate verdicts, accepted deviations, unresolved risks, and a `Ready for Acceptance Verification` comment/checklist.
 
 ---
 
@@ -329,11 +345,14 @@ The check answers:
 - Existing typed API contract sufficient? yes/no, with file paths
 - New request/response fields needed? yes/no
 - Server-side validation/auth/ownership needed? yes/no
+- Cross-entity IDs or durable linkage introduced? yes/no, with write-side validation plan
 - Persistence/metadata needed? yes/no
 - Backend/API tests needed? yes/no
 - Runtime/browser validation needed? yes/no
 
 If any backend/API/persistence answer is `yes`, the plan must include backend/API/test work before frontend wiring. Do not make production behavior work by tunneling structured state through free-text fields such as `notes`, `description`, or `metadataJson` when a typed contract is required.
+
+When cross-entity IDs or durable links are introduced, write-side validation must prove create/update endpoints reject malformed IDs, nonexistent resources, deleted resources, cross-user/tenant resources, and invalid child-item references before saving. Read-side filtering or happy-path persistence alone is not sufficient evidence.
 
 ---
 
@@ -539,7 +558,15 @@ A final **report** is recorded in the selected state backend using `## 🚀 Spri
 - Open warnings, deferred work, or accepted risks
 - What to watch for in production
 
-The feature is not complete until the final completion record exists. In GitHub mode, the epic issue must be closed or labeled done according to repository practice. In filesystem mode, the sprint file status must be `✅ done` and the completion report must be present.
+The team-lead must also post `## 🧑‍⚖️ Ready for Acceptance Verification: <sprint-or-feature-id>`. This comment is mandatory and must be derived from the **original** acceptance criteria, scope, design spec, source-of-truth, or source delta audit — not from what happened to be implemented. It must include:
+- an acceptance checklist mapped to the original criteria/scope;
+- manual verification steps for the human;
+- expected results;
+- source references, screenshots, planner/reference pages, or artifacts to inspect;
+- unresolved risks, accepted deviations, and remaining deltas;
+- an explicit note that tests/commits are implementation evidence only and are not acceptance.
+
+The feature is not ready for human disposition until both the final completion record and the Ready for Acceptance Verification comment exist. In GitHub mode, the issue must remain open and un-final-labeled; a human verifies acceptance criteria and decides whether/when to close or label the issue. In filesystem mode, the sprint file status may be `✅ done` and the completion report plus acceptance-verification checklist must be present.
 
 ---
 

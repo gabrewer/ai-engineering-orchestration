@@ -84,7 +84,7 @@ PiLoop should eventually automate most of this path:
 - default folder creation
 - starter prompt/skill generation
 - sample PRD scaffolding
-- GitHub label setup
+- GitHub label setup for non-final workflow labels only; PiLoop must not apply final disposition labels like `done`, `complete`, or `shipped`
 - first planning-run command hints
 
 ## Design principle
