@@ -36,6 +36,9 @@ public sealed class GitHubAuditService
     public Task PublishEvidenceAsync(int issueNumber, EvidenceEvent evidence) =>
         _github.CommentOnIssueAsync(issueNumber, EvidenceRenderer.RenderMarkdown(evidence));
 
+    public Task PublishCommentAsync(int issueNumber, string markdown) =>
+        _github.CommentOnIssueAsync(issueNumber, markdown);
+
     internal static string FormatBreadcrumbComment(BreadcrumbEvent breadcrumb)
     {
         var builder = new StringBuilder();

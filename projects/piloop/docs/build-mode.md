@@ -56,6 +56,9 @@ For each task, PiLoop:
    - otherwise records validation as skipped
 10. commits task changes unless `--no-commit` is specified and validation/review passed
 11. publishes a task evidence comment with intent, plan, branch, commit SHA when committed, work performed, decisions, blockers, test results, remaining issues, artifacts, and summary
+12. when implementation validation passes, publishes a `Ready for Acceptance Verification` comment derived from the original task acceptance criteria/scope rather than from the implementation summary
+
+Build mode must never close GitHub issues and must never apply final completion/disposition labels such as `done`, `complete`, or `shipped`. It records evidence and prepares acceptance verification checklists only; human maintainers own final issue disposition.
 
 ## Resume behavior
 

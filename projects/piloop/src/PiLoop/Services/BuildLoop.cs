@@ -246,6 +246,9 @@ public sealed class BuildLoop
         {
             var evidence = BuildTaskEvidence(task, state.Branch, gitCommit, workerResults, changes, validation);
             await audit.PublishEvidenceToTaskAsync(issueNumber, evidence);
+
+            if (validation.Passed)
+                await audit.PublishCommentAsync(issueNumber, BuildReadyForHumanAcceptanceComment(task, gitCommit, workerResults, changes, validation));
         }
 
         ActivityLog.TaskDone(task.Id, taskState.Status);
@@ -549,6 +552,70 @@ Your final JSON must make the work defensible. Include what you changed, why, al
         TaskType.Both => ["backend-builder", "frontend-builder"],
         _ => ["backend-builder"],
     };
+
+    private static string BuildReadyForHumanAcceptanceComment(PrdTask task, GitCommitInfo? gitCommit, IReadOnlyList<PiWorkerResult> results, IReadOnlyList<WorktreeChange> changes, ValidationResult validation)
+    {
+        var checklist = task.AcceptanceCriteria.Length == 0
+            ? "- [ ] Verify the original task description and source-of-truth scope are satisfied; no explicit acceptance criteria were supplied."
+            : string.Join('\n', task.AcceptanceCriteria.Select(c => $"- [ ] {c}"));
+
+        var manualSteps = task.AcceptanceCriteria.Length == 0
+            ? "1. Re-read the task description and linked source-of-truth/design artifacts.\n2. Exercise the affected workflow manually.\n3. Confirm behavior matches the original scope, not just the implementation summary."
+            : string.Join('\n', task.AcceptanceCriteria.Select((c, i) => $"{i + 1}. Manually verify: {c}"));
+
+        var expectedResults = task.AcceptanceCriteria.Length == 0
+            ? "- The affected workflow satisfies the original task description and source-of-truth scope."
+            : string.Join('\n', task.AcceptanceCriteria.Select(c => $"- {c}"));
+
+        var artifacts = results.SelectMany(r => r.Artifacts.Select(a => a.Path))
+            .Concat(changes.Select(c => c.Path))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var risks = results
+            .Where(r => r.Status is PiWorkerStatus.Blocked or PiWorkerStatus.Escalate or PiWorkerStatus.Failed or PiWorkerStatus.ChangesNeeded || !string.IsNullOrWhiteSpace(r.NextAction))
+            .Select(r => $"- {r.Summary}; next: {r.NextAction}")
+            .Distinct()
+            .ToArray();
+
+        if (risks.Length == 0)
+            risks = ["- No unresolved worker risks recorded. Human acceptance is still required."];
+
+        var tests = validation.TestResults.Length == 0
+            ? "- No automated tests recorded."
+            : string.Join('\n', validation.TestResults.Select(t => $"- `{t.Command}` → {t.Result}"));
+
+        return $"""
+## 🧑‍⚖️ Ready for Acceptance Verification: {task.Id}
+
+**Important:** Passing tests and commits are implementation evidence only. They are not acceptance. This issue must remain open until a human verifies the original acceptance criteria/scope/design/source-of-truth and decides disposition.
+
+### Acceptance checklist from original criteria / scope
+{checklist}
+
+### Manual verification steps for the human
+{manualSteps}
+
+### Expected results
+{expectedResults}
+
+### Source references / artifacts to inspect
+- Task source-of-truth: original issue/sprint task description and linked design/spec artifacts.
+{(artifacts.Length == 0 ? "- No changed artifacts recorded." : string.Join('\n', artifacts.Select(a => $"- `{a}`")))}
+{(gitCommit is null ? "- Commit: n/a" : $"- Commit: `{gitCommit.ShortSha}` (`{gitCommit.Sha}`)")}
+
+### Automated evidence, not acceptance
+{tests}
+
+### Unresolved risks / remaining deltas
+{string.Join('\n', risks)}
+
+### Human disposition
+- [ ] Human verified acceptance criteria against the original source-of-truth.
+- [ ] Human reviewed unresolved risks / remaining deltas.
+- [ ] Human decides whether to close or label the issue. Automation must not close or final-label it.
+""";
+    }
 
     private static EvidenceEvent BuildTaskEvidence(PrdTask task, string branch, GitCommitInfo? gitCommit, IReadOnlyList<PiWorkerResult> results, IReadOnlyList<WorktreeChange> changes, ValidationResult validation)
     {

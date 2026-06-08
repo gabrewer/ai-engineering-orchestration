@@ -285,14 +285,6 @@ public sealed class GitHubService
     }
 
     /// <summary>
-    /// Closes an issue.
-    /// </summary>
-    public async Task CloseIssueAsync(int issueNumber)
-    {
-        await RunGhAsync("issue", "close", issueNumber.ToString());
-    }
-
-    /// <summary>
     /// Checks a task checkbox on the epic issue body.
     /// </summary>
     public async Task CheckTaskOnEpicAsync(int epicNumber, string taskId)
