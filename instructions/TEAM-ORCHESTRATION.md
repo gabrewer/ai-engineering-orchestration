@@ -277,7 +277,7 @@ Use this format for task progress in either backend:
 ## <emoji> Agent Update: <agent-name> — <task-id> — Round <N>
 
 **Status:** 🧭 planning | 🧱 ready | 🚧 in progress | ✅ completed | ❌ blocked | ⚠️ warning
-**Commit(s):** <sha/link or n/a>
+**Commit(s):** <sha/link or n/a before commit gate only; completed implementation work must cite real SHA(s)>
 **Summary:** <what changed or was decided>
 **Verification:** <commands/results or n/a>
 **Findings:** <blockers/warnings/notes or n/a>
@@ -294,7 +294,17 @@ Use these quality-gate headings exactly:
 
 ### Quality Gates Are Not Task-Board Work
 
-Destroyer, review-agent, and final tester/smoke phases are mandatory orchestration phases, not ordinary build tasks. Do not duplicate them as child issues or task-board checklist items unless a project explicitly needs a custom test-harness build task. Track them in a `Quality Gates` section of the parent issue/sprint file and via the standard reports above.
+Destroyer, review-agent, git-committer, and final tester/smoke phases are mandatory orchestration phases, not ordinary build tasks. Do not duplicate them as child issues or task-board checklist items unless a project explicitly needs a custom test-harness build task. Track them in a `Quality Gates` section of the parent issue/sprint file and via the standard reports above.
+
+### Commit Gate
+
+The team-lead must run the `git-committer` phase after the review-agent returns `SHIP IT` and before posting `## 🧑‍⚖️ Ready for Acceptance Verification` or `## 🚀 Sprint Complete`.
+
+- Completed implementation work must cite real commit SHA(s). Do not use `Commit(s): n/a` for completed code, tests, configuration, documentation deliverables, or build fixes unless the human explicitly approved a no-commit deviation.
+- If task-owned changes remain uncommitted, the sprint is not ready for acceptance verification.
+- The git-committer must separate unrelated pre-existing working-tree changes from task-owned changes and must not commit `.agentloop/tmp/`, logs, state files, or other temporary artifacts.
+- If the repository is on `main` or `master`, create/use a feature branch before committing, following the project git-safety rules.
+- Final readiness must include commit SHA(s), verification evidence, and any explicit no-commit deviations.
 
 ### Lesson learned: high-quality sprint control issue
 
@@ -307,7 +317,7 @@ For large parity, migration, or multi-workstream features, prefer a single umbre
 5. **Quality gate comments** — destroyer, reviewer, and tester reports posted as comments with round numbers, blockers/warnings, and remediation evidence.
 6. **Final matrix** — every audit row resolved as implemented, accepted deviation, or blocked, with source evidence and test/browser/runtime evidence.
 
-Do not report completion from the team-lead until the final control issue/file has commits, verification commands/results, quality-gate verdicts, accepted deviations, unresolved risks, and a `Ready for Acceptance Verification` comment/checklist.
+Do not report completion from the team-lead until the final control issue/file has real commit SHA(s), verification commands/results, quality-gate verdicts, accepted deviations, unresolved risks, and a `Ready for Acceptance Verification` comment/checklist.
 
 ---
 
@@ -566,7 +576,7 @@ The team-lead must also post `## 🧑‍⚖️ Ready for Acceptance Verification
 - unresolved risks, accepted deviations, and remaining deltas;
 - an explicit note that tests/commits are implementation evidence only and are not acceptance.
 
-The feature is not ready for human disposition until both the final completion record and the Ready for Acceptance Verification comment exist. In GitHub mode, the issue must remain open and un-final-labeled; a human verifies acceptance criteria and decides whether/when to close or label the issue. In filesystem mode, the sprint file status may be `✅ done` and the completion report plus acceptance-verification checklist must be present.
+The feature is not ready for human disposition until task-owned changes are committed and both the final completion record and the Ready for Acceptance Verification comment exist. In GitHub mode, the issue must remain open and un-final-labeled; a human verifies acceptance criteria and decides whether/when to close or label the issue. In filesystem mode, the sprint file status may be `✅ done` and the completion report plus acceptance-verification checklist must be present.
 
 ---
 

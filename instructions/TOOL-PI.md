@@ -169,7 +169,7 @@ Fix missing frontmatter, invalid skill names, or path mistakes before planning r
 
 Pi prompt templates live in `.pi/prompts/*.md` and become slash commands in interactive mode. Use them for human-facing workflows such as brainstorming, planning, team-lead execution, review, or release checklists.
 
-High-quality project workflows should use **thin, project-specific front-door prompts** rather than generic agent invocations. A good `/pm-agent` prompt reads the design/spec, audits source, creates the authoritative sprint issue/file, and defines the task quality bar. A good `/team-lead` prompt runs the build loop itself, loading worker skills by path at each phase and enforcing quality gates before completion.
+High-quality project workflows should use **thin, project-specific front-door prompts** rather than generic agent invocations. A good `/pm-agent` prompt reads the design/spec, audits source, creates the authoritative sprint issue/file, and defines the task quality bar. A good `/team-lead` prompt runs the build loop itself, loading worker skills by path at each phase and enforcing the canonical gates from `TEAM-ORCHESTRATION.md` before completion.
 
 Example:
 
@@ -195,10 +195,10 @@ Use the Lessi.App sequence-parity workflow as the target quality bar for generat
 - **Write-side validation**: if typed IDs link persisted resources, require create/update paths to reject malformed, nonexistent, deleted, cross-user/tenant, and invalid child-item references before persistence.
 - **Source delta audit**: for parity/migration work, require a matrix with source behavior, target behavior, status, required fix/deviation, and source references before coding.
 - **Implementation-ready tasks**: every task names agent, dependencies, files to read/change, acceptance criteria, exact verification command, commit hint, and skills to load.
-- **Quality gates as phases**: destroyer, reviewer, and tester are mandatory phases, not ordinary task-board work. The prompt must auto-remediate blockers and rerun gates until pass or threshold.
-- **Evidence standard**: final completion must cite commits, source evidence, test evidence, runtime/browser evidence, accepted deviations, and unresolved risks.
-- **Acceptance verification gate**: agents must prepare a `Ready for Acceptance Verification` comment with a checklist derived from the original acceptance criteria/scope/design/source-of-truth, manual verification steps, expected results, source references/screenshots/reference pages, unresolved risks, and remaining deltas. Passing tests/commits are not acceptance.
-- **No issue closure**: agents must never close GitHub issues or apply final completion/disposition labels such as `done`, `complete`, or `shipped`; post a final summary and acceptance-verification comment only.
+- **Quality gates as phases**: prompt templates must enforce the canonical destroyer, reviewer, committer, tester/smoke, readiness, and issue-disposition gates from `TEAM-ORCHESTRATION.md`.
+- **Evidence standard**: final completion must cite the evidence required by `TEAM-ORCHESTRATION.md` without redefining it locally.
+- **Acceptance verification gate**: agents must prepare the `Ready for Acceptance Verification` artifact defined by `TEAM-ORCHESTRATION.md`; passing tests/commits are implementation evidence only, not acceptance.
+- **No issue closure**: agents must follow the canonical issue-disposition rules in `TEAM-ORCHESTRATION.md`.
 - **Temporary files**: compose GitHub bodies/comments under `.pi/tmp/` or `.agentloop/tmp/` and never commit them.
 
 ### Recommended project prompt set

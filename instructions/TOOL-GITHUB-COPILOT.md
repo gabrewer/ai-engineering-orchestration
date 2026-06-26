@@ -82,4 +82,5 @@ Or programmatically via the GitHub Copilot CLI or VS Code extension API. Configu
 - Agent Skills live under `.agents/skills/<skill-name>/SKILL.md`; each skill should be a directory containing `SKILL.md` and any supporting references/scripts/assets.
 - The `task-issues.json` file is created during brainstorming and lives at the project root.
 - Copilot's coding agent can be assigned tasks directly via GitHub Issues (assign the issue to `@copilot`), which is an alternative to agentloop-driven invocation.
-- Follow `TEAM-ORCHESTRATION.md`: the user specifies either GitHub Issues mode or filesystem mode as the state backend. Do not choose autonomously. In GitHub mode, post progress and reports as issue comments and use `.agentloop/tmp/` for `gh --body-file` drafts. In filesystem mode, write the same updates to `docs/sprints/`, `docs/reviews/`, and `docs/reports/`.
+- Follow `TEAM-ORCHESTRATION.md` as the canonical, harness-agnostic workflow; this file is only the GitHub Copilot adapter for paths, formats, and invocation.
+- Do not restate or override canonical state-backend, quality-gate, commit-gate, readiness, or issue-disposition rules here.
