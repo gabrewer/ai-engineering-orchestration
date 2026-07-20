@@ -31,7 +31,7 @@
 
 -
 
-## External Review
+## Document Review
 
 <!-- This repository is public. Please review changes with an external reader in mind. -->
 
