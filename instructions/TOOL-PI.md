@@ -74,6 +74,7 @@ AGENTS.md                         # Repo-wide Pi instructions; create only if ab
   prompts/
     pm-agent.md                   # planning front door
     team-lead.md                  # execution/build-loop front door
+    pr-checkpoint.md               # on-demand branch growth / PR boundary report
 .agents/
   skills/
     product-designer/SKILL.md
@@ -103,6 +104,7 @@ If no repo-level context file exists, create a short `AGENTS.md` with:
 - Use the repo's documented package manager and build/test commands.
 - Keep generated plans, issue drafts, logs, and state out of commits unless they are durable project artifacts.
 - Never close GitHub issues or apply final disposition labels; prepare acceptance evidence for a human instead.
+- Apply the pull-request size checkpoints from `instructions/TEAM-ORCHESTRATION.md`; recommend review before branch scope becomes difficult to audit.
 ```
 
 If `AGENTS.md` or `CLAUDE.md` already exists, append only the Pi/PiLoop deltas and keep the existing project rules authoritative.
@@ -193,8 +195,10 @@ Use the Lessi.App sequence-parity workflow as the target quality bar for generat
 - **Full-stack default**: require a Contract Impact Check before tasking. Frontend-only is allowed only when explicitly marked `UI polish only`, `docs only`, or `frontend prototype only`.
 - **No state tunneling**: forbid production behavior that hides structured domain state in free-text fields such as `notes`, `description`, `metadataJson`, or local/session storage when a typed API contract is required.
 - **Write-side validation**: if typed IDs link persisted resources, require create/update paths to reject malformed, nonexistent, deleted, cross-user/tenant, and invalid child-item references before persistence.
+- **Risk-based backend testing**: follow repository test conventions; require automated integration tests—not unit tests alone—when behavior depends on HTTP, auth/ownership/tenancy, persistence, concurrency, messaging, service discovery, gateways, or other runtime boundaries.
 - **Source delta audit**: for parity/migration work, require a matrix with source behavior, target behavior, status, required fix/deviation, and source references before coding.
 - **Implementation-ready tasks**: every task names agent, dependencies, files to read/change, acceptance criteria, exact verification command, commit hint, and skills to load.
+- **PR size checkpoints**: `/pm-agent` plans reviewable PR slices, `/team-lead` measures before/after coherent batches, and `git-committer` reports the canonical `BELOW`/`ADVISORY`/`STRONG` checkpoint from `TEAM-ORCHESTRATION.md`.
 - **Quality gates as phases**: prompt templates must enforce the canonical destroyer, reviewer, committer, tester/smoke, readiness, and issue-disposition gates from `TEAM-ORCHESTRATION.md`.
 - **Evidence standard**: final completion must cite the evidence required by `TEAM-ORCHESTRATION.md` without redefining it locally.
 - **Acceptance verification gate**: agents must prepare the `Ready for Acceptance Verification` artifact defined by `TEAM-ORCHESTRATION.md`; passing tests/commits are implementation evidence only, not acceptance.
@@ -208,6 +212,7 @@ For PiLoop-style projects, install at least:
 ```text
 .pi/prompts/pm-agent.md      # spec/design → audited sprint issue/file
 .pi/prompts/team-lead.md     # sprint issue/file → build loop + gates + final summary + acceptance checklist
+.pi/prompts/pr-checkpoint.md  # branch/base → commits/files + review-boundary recommendation
 ```
 
 The prompt names should match entries in `.pi/skill-models.json` when using model routing.
