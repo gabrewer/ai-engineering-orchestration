@@ -79,9 +79,11 @@ Defines and builds the contract between frontend and backend.
 
 Writes tests for a given task — before any implementation exists.
 
-- Tests must fail 100% when written. If any test passes at write time, that is a hard stop
+- Tests for genuinely new behavior should fail before implementation. Regression tests for existing guarantees may already pass; record those as baseline/resilient evidence. If a supposed new-behavior test passes, inspect whether the behavior already exists or the test is too weak before continuing.
 - Works against the API contract and domain model
-- **Backend tasks**: xUnit **unit tests only** — pure domain logic, aggregates, events, handlers. No Docker, no Aspire stack, no HTTP calls. Integration tests are out of scope and run manually.
+- **Backend tasks**: follow the repository's documented test frameworks and conventions; do not impose a unit-test-only policy. Use unit tests for isolated pure logic when valuable, and automated integration tests whenever correctness depends on HTTP contracts, authentication, authorization, ownership/tenancy, persistence, transactions, concurrency, messaging, service discovery, gateway/routing policy, or other runtime boundaries. Prefer real project-owned dependencies; mock or emulate external providers only as the repository permits.
+- Security-sensitive boundary tests must exercise rejection paths such as unauthenticated, unauthorized, cross-user/tenant, forged or nonexistent linkage, failed authority/provider dependencies, no-mutation-on-rejection, and genuine concurrent attempts where applicable.
+- Integration evidence belongs in the automated task/sprint verification path rather than being deferred to an unspecified manual run. If required infrastructure cannot run, report the check as `NOT CHECKED` with the reason and treat it as blocking unless the human explicitly accepts the gap.
 - **Frontend tasks**: Vitest for component logic and hooks — no browser, no real API calls
 - Playwright is **not** the test-writer's responsibility — see `frontend-builder` below
 - **Tools**: Read, Write, Glob, Grep, Bash (for running tests only)
@@ -306,6 +308,31 @@ The team-lead must run the `git-committer` phase after the review-agent returns 
 - If the repository is on `main` or `master`, create/use a feature branch before committing, following the project git-safety rules.
 - Final readiness must include commit SHA(s), verification evidence, and any explicit no-commit deviations.
 
+### Pull Request Size Checkpoint
+
+Large branches hide security, integration, and review failures. Unless a repository explicitly defines different thresholds in its own instructions, every tool adapter, team-lead prompt, PM/planner prompt, and git-committer must apply these default checkpoints.
+
+Measure branch growth against the intended pull-request base:
+
+1. If the branch already has a pull request, use its `baseRefName` from the hosting provider.
+2. Otherwise use the repository mainline branch (`origin/main`, or `origin/master` where applicable).
+3. Count commits reachable from `HEAD` but not the base and count unique changed files from the merge base to `HEAD`.
+
+**Advisory checkpoint — 8 commits or 30 changed files:** finish the current coherent task or safe batch, then recommend opening a pull request. If a pull request already exists, recommend stopping scope growth and moving it through review.
+
+**Strong checkpoint — 15 commits or 60 changed files:** do not begin additional feature scope. Stabilize the smallest coherent change, report the branch/base/counts and existing PR URL/state, and require a human decision before more independent work is added. Move remaining independently deliverable work to a follow-up branch, sprint, or stacked pull request.
+
+Checkpoint behavior:
+
+- Check before implementation, after each coherent task/commit batch, and before another sprint or materially distinct concern starts on the branch.
+- The PM/planner should define earlier review boundaries when a planned sprint is likely to cross a checkpoint.
+- The git-committer reports `BELOW`, `ADVISORY`, or `STRONG` with commit/file counts after each successful commit. GitHub/provider metadata lookup is best effort and must not invalidate a successful commit.
+- Generated files may be reported separately but still count toward review burden.
+- Do not interrupt an atomic safety fix, leave a migration half-complete, or propose review while known blockers or required tests are failing. Stabilize first, then stop scope growth.
+- Security boundaries, migrations, deployment changes, and public contracts should receive earlier review boundaries when independently deliverable.
+- A checkpoint is a recommendation and scope-control pause, not permission to push or create a pull request without user authorization.
+- If the user explicitly continues past a checkpoint, record the decision in the selected state backend and repeat the check after the next coherent batch.
+
 ### Lesson learned: high-quality sprint control issue
 
 For large parity, migration, or multi-workstream features, prefer a single umbrella/control issue when the human wants cohesive execution instead of issue sprawl. The control issue should contain or link all of the following before implementation starts:
@@ -344,6 +371,7 @@ Each Task in the Sprint plan or selected-backend task board includes:
 - **Sprint** — which Sprint it belongs to
 - **Assigned to** — which builder agent owns it
 - **Commit hint** — conventional commit message for the smallest coherent change
+- **PR slice/checkpoint** — the intended review boundary when the sprint may approach the default commit/file thresholds
 
 ### Contract Impact Check
 
@@ -432,8 +460,9 @@ loop/dist/agentloop build --all --resume
 4. Executes Sprints in sequence; tasks within a wave run in parallel
 5. For each Sprint: `domain-modeler` → `api-developer` → per-task pipeline
 6. For each task: `test-writer` → builders → `destroyer` → `review-agent` (up to 6 attempts) → `git-committer`
-7. After all tasks: `pm` agent writes a sprint summary
-8. Shows a live terminal dashboard throughout
+7. After each committed task/batch, applies the Pull Request Size Checkpoint before starting more scope
+8. After all tasks: `pm` agent writes a sprint summary
+9. Shows a live terminal dashboard throughout
 
 ---
 
@@ -474,6 +503,7 @@ Once the user approves the plan:
   - Every task has its status emoji (start with 🏃/🚧 for the first task, rest 🧱 ready).
   - In GitHub mode, every task has its own child issue unless the project intentionally uses one sprint issue with embedded checklist tasks.
   - In GitHub mode, every issue has appropriate labels applied.
+- Define explicit PR/review boundaries when the plan is likely to reach 8 commits or 30 changed files; split the plan into follow-up or stacked PR slices when it is likely to reach 15 commits or 60 files unless the work is genuinely atomic.
 - Create **verification scripts** at `verify/<feature-name>/` — one shell script per task that needs verification, named by task ID (e.g., `verify/user-auth/task-003.sh`).
 - In GitHub mode, create `task-issues.json` — a mapping of task IDs to GitHub issue numbers (e.g., `{"task-001": 42, "task-002": 43}`). In filesystem mode, omit it or map task IDs to sprint-file anchors.
 - Commit durable artifacts only: plan docs that should survive, filesystem sprint files, verification scripts, task mapping, and configuration. Do not commit temporary issue-body/comment files.
@@ -529,13 +559,14 @@ The `api-developer` defines or updates the API contract for this Sprint's tasks.
 
 For each task in the Sprint:
 
-1. **`test-writer`** — writes tests that must fail 100% at write time
+1. **`test-writer`** — writes the repository-appropriate unit and/or integration tests required by the task's contract and risk; new-behavior tests must fail at write time, while regression tests for existing guarantees may already pass and should be recorded as resilient evidence
 2. **Builders** (`backend-builder` / `frontend-builder`) — write code until all tests pass
 3. **Build gate** — `dotnet build` must exit 0 before the destroyer runs. If it fails, the error is fed back to the builder. Code that does not compile never reaches the reviewer.
 4. **`destroyer`** — adversarial testing scoped to this task's code only. Only critical/high findings are actionable. Medium/low are noted but do not block.
 5. **`review-agent`** — triages destroyer findings, routes fixes to builders, escalates big issues
-6. **`git-committer`** — commits after `SHIP IT`
-7. **Failed task cleanup** — if a task exceeds max review attempts, all uncommitted working tree changes are discarded (`git checkout -- . && git clean -fd`) so broken code does not leak into subsequent tasks.
+6. **`git-committer`** — commits after `SHIP IT`, then measures and reports the Pull Request Size Checkpoint
+7. **Branch growth gate** — at the strong checkpoint, do not start another independent feature task without a human decision; finish only the smallest coherent stabilization required for a reviewable branch
+8. **Failed task cleanup** — if a task exceeds max review attempts, all uncommitted working tree changes are discarded (`git checkout -- . && git clean -fd`) so broken code does not leak into subsequent tasks.
 
 #### Step 4: Sprint Smoke Test
 
