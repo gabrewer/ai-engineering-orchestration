@@ -3,3 +3,6 @@
 .agentloop/logs/
 .agentloop/state-*.json
 .agentloop/pi-sessions/
+
+# Visual Studio workspace state
+.vs/
