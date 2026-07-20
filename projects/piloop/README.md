@@ -51,6 +51,7 @@ PiLoop should support two onboarding paths:
 - `docs/evidence-contract.md` — what PiLoop records to GitHub Issues for defensible work history
 - `docs/build-mode.md` — current build-mode command behavior and limitations
 - `docs/model-selection.md` — prompt-level model selection and CLI override precedence
+- `docs/pr-agent-workflow-prd.md` — proposed standalone PR lifecycle agent, separate from team-lead
 
 ## Current status
 
