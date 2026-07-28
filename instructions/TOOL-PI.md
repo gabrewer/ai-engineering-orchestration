@@ -1,6 +1,31 @@
 # Tool Configuration: Pi
 
-This file describes how to configure agentloop for use with **Pi** — a minimal terminal coding harness with built-in file/edit/bash tools, project context files, skills, prompt templates, extensions, and print/JSON/RPC modes.
+This file describes how to configure the team-orchestration workflow for **Pi** — a minimal terminal coding harness with built-in file/edit/bash tools, project context files, skills, prompt templates, and extensions.
+
+## Prompt and Skill Topology
+
+The Pi workflow has two required front doors:
+
+- `/pm-agent` owns the end-to-end planning experience.
+- `/team-lead` owns the end-to-end execution experience.
+
+Worker specialization belongs primarily in skills loaded by those prompts. Avoid mechanically turning every internal phase into another prompt, but allow additional prompts when they represent a clear standalone workflow or useful operator command. Before generating project resources, show the proposed prompt-to-skill map and confirm that planning and execution remain understandable without exposing orchestration internals to the user.
+
+Project-specific guidance may specialize this topology. Treat a change to front-door ownership as an intentional design decision, not an accidental consequence of a generated blueprint.
+
+## Prepare Project-Specific Context
+
+Before generating Pi prompts and skills, ask the active agent to create a short project-specific context document. This document should help adapt the generic orchestration roles to the project without becoming a second workflow specification.
+
+For work driven by a PRD or design document, use a prompt like:
+
+> Okay, now let's examine the work we need to do in `@<path-to-prd>` and create some documentation to help `@instructions/TEAM-ORCHESTRATION.md` and `@instructions/TOOL-PI.md` create great skills and prompts for this project.
+
+For an existing project, have the agent inspect the codebase instead:
+
+> Okay, now let's review the existing codebase, including its architecture, build and test commands, conventions, and current agent instructions, and create some documentation to help `@instructions/TEAM-ORCHESTRATION.md` and `@instructions/TOOL-PI.md` create great skills and prompts for this project.
+
+Adjust the referenced paths if the instruction files were copied somewhere else. Review the resulting project context before asking the agent to propose or generate the actual prompt and skill resources.
 
 ---
 
@@ -13,11 +38,8 @@ AGENTS.md                   # Repo-wide Pi context/instructions
   prompts/                  # Prompt templates (one .md per slash command)
   extensions/               # Optional TypeScript extensions/tools/commands
   settings.json             # Optional Pi resource/model/tool settings
-verify/                     # Verification scripts (one subdirectory per feature)
-.agentloop/
   tmp/                      # Temporary GitHub issue bodies/comments; never committed
-  logs/                     # agentloop diagnostic logs; never committed
-  state-*.json              # agentloop run state; never committed
+verify/                     # Verification scripts (one subdirectory per feature)
 task-issues.json            # Task ID → GitHub issue number mapping (GitHub mode only)
 ```
 
@@ -27,17 +49,14 @@ In filesystem state-backend mode, durable orchestration state lives in the paths
 
 ## Agent Definition Format
 
-Pi does not ship a native subagent file format. For agentloop, define each role as either:
-
-1. a **Pi skill** in `.pi/skills/<agent-name>/SKILL.md` or `.agents/skills/<agent-name>/SKILL.md`; or
-2. a plain prompt file consumed by agentloop and passed to `pi -p` / `pi --mode json`.
+Pi does not ship a native subagent file format. Define each worker role as a **Pi skill** in `.pi/skills/<agent-name>/SKILL.md` or `.agents/skills/<agent-name>/SKILL.md`. The `/team-lead` prompt loads the appropriate skill when each phase begins and applies it within the active session.
 
 Recommended project-local skill format:
 
 ```markdown
 ---
 name: backend-builder
-description: Builds backend code for one assigned task. Use when implementing server-side application changes from an agentloop task.
+description: Builds backend code for one assigned task. Use when implementing server-side application changes from an approved orchestration task.
 ---
 
 You are the backend-builder...
@@ -61,6 +80,8 @@ Before adding files, inspect and record:
 - current branching and PR expectations;
 - existing issue labels, milestones, and release workflow;
 - where temporary files and generated artifacts must not be written.
+
+Do not invent solution, project, package, test, or verification paths. If a workstream has no build surface yet, make the first scaffold/build command an explicit bootstrap task and plan later work from the resulting real structure.
 
 If the repo already has project instructions, preserve them and merge Pi-specific guidance into the least surprising place rather than replacing them.
 
@@ -87,7 +108,7 @@ AGENTS.md                         # Repo-wide Pi instructions; create only if ab
     destroyer/SKILL.md
     review-agent/SKILL.md
     git-committer/SKILL.md
-.agentloop/                       # runtime only; ignored
+.pi/tmp/                          # temporary drafts only; ignored
 ```
 
 Use `.agents/skills/` for worker identities when you want the same skill files to be reusable by other Agent Skills-compatible harnesses. Use `.pi/skills/` for Pi-only skills. Do not add both unless there is a clear reason.
@@ -107,7 +128,7 @@ If no repo-level context file exists, create a short `AGENTS.md` with:
 - Apply the pull-request size checkpoints from `instructions/TEAM-ORCHESTRATION.md`; recommend review before branch scope becomes difficult to audit.
 ```
 
-If `AGENTS.md` or `CLAUDE.md` already exists, append only the Pi/PiLoop deltas and keep the existing project rules authoritative.
+If `AGENTS.md` or `CLAUDE.md` already exists, append only the Pi orchestration deltas and keep the existing project rules authoritative.
 
 ### 4. Create worker skills from the project context
 
@@ -116,7 +137,7 @@ Each worker skill should be a directory with `SKILL.md` and frontmatter:
 ```markdown
 ---
 name: backend-builder
-description: Builds backend code for one assigned task in this repository. Use when implementing server-side changes from a PiLoop task.
+description: Builds backend code for one assigned task in this repository. Use when implementing server-side changes from an approved sprint task.
 ---
 
 # Backend Builder
@@ -128,22 +149,20 @@ Keep the first version conservative. Prefer narrow, repository-specific instruct
 
 ### 5. Create the two front-door prompts
 
-Install at least:
+Install both:
 
 - `.pi/prompts/pm-agent.md` — converts a PRD/spec into an audited sprint issue/file.
 - `.pi/prompts/team-lead.md` — executes an approved sprint through worker skills and quality gates.
 
 Both prompts must name exact files to read first, the selected state backend, temp-file paths, quality-gate headings, verification commands, and the rule that acceptance verification is prepared for a human rather than self-approved.
 
+Before creating prompts and skills, present a concise resource map showing each prompt, the worker skills it coordinates, and the proposed provider/model/thinking assignment. This is a design review, not a requirement to forbid additional prompts.
+
 ### 6. Update ignore rules
 
 Add only missing entries:
 
 ```gitignore
-.agentloop/tmp/
-.agentloop/logs/
-.agentloop/state-*.json
-.agentloop/pi-sessions/
 .pi/tmp/
 ```
 
@@ -154,13 +173,13 @@ Do not ignore `.pi/prompts/`, `.pi/skills/`, `.agents/skills/`, or durable sprin
 From the repo root:
 
 ```bash
-pi --no-extensions --tools read,grep,find,ls -p "List the available project skills and prompt templates. Do not edit files."
+pi --approve --no-extensions --tools read,grep,find,ls -p "List the available project skills and prompt templates. Summarize which prompt owns planning, which owns execution, and whether any optional prompt has overlapping responsibility. Do not edit files."
 ```
 
 Then test one worker explicitly:
 
 ```bash
-pi --no-extensions --tools read,grep,find,ls --skill .agents/skills/review-agent/SKILL.md -p "Read the project instructions and summarize the review boundaries. Do not edit files."
+pi --approve --no-extensions --tools read,grep,find,ls --skill .agents/skills/review-agent/SKILL.md -p "Read the project instructions and summarize the review boundaries. Do not edit files."
 ```
 
 Fix missing frontmatter, invalid skill names, or path mistakes before planning real work.
@@ -172,6 +191,8 @@ Fix missing frontmatter, invalid skill names, or path mistakes before planning r
 Pi prompt templates live in `.pi/prompts/*.md` and become slash commands in interactive mode. Use them for human-facing workflows such as brainstorming, planning, team-lead execution, review, or release checklists.
 
 High-quality project workflows should use **thin, project-specific front-door prompts** rather than generic agent invocations. A good `/pm-agent` prompt reads the design/spec, audits source, creates the authoritative sprint issue/file, and defines the task quality bar. A good `/team-lead` prompt runs the build loop itself, loading worker skills by path at each phase and enforcing the canonical gates from `TEAM-ORCHESTRATION.md` before completion.
+
+Use worker skills for internal phases by default. Add another prompt when it gives the user a distinct workflow or operator utility, and state how it relates to the two primary front doors.
 
 Example:
 
@@ -203,11 +224,11 @@ Use the Lessi.App sequence-parity workflow as the target quality bar for generat
 - **Evidence standard**: final completion must cite the evidence required by `TEAM-ORCHESTRATION.md` without redefining it locally.
 - **Acceptance verification gate**: agents must prepare the `Ready for Acceptance Verification` artifact defined by `TEAM-ORCHESTRATION.md`; passing tests/commits are implementation evidence only, not acceptance.
 - **No issue closure**: agents must follow the canonical issue-disposition rules in `TEAM-ORCHESTRATION.md`.
-- **Temporary files**: compose GitHub bodies/comments under `.pi/tmp/` or `.agentloop/tmp/` and never commit them.
+- **Temporary files**: compose GitHub bodies/comments under `.pi/tmp/` and never commit them.
 
 ### Recommended project prompt set
 
-For PiLoop-style projects, install at least:
+For this orchestration style, install at least:
 
 ```text
 .pi/prompts/pm-agent.md      # spec/design → audited sprint issue/file
@@ -216,6 +237,12 @@ For PiLoop-style projects, install at least:
 ```
 
 The prompt names should match entries in `.pi/skill-models.json` when using model routing.
+
+### Model assignments
+
+Run `pi --list-models` in the target environment before choosing routes. For every installed prompt and skill, record an exact provider, model ID, and thinking level in the proposed resource map and in a shared `.pi/skill-models.json` when model routing is enabled. Do not copy model IDs from another machine without verifying availability.
+
+Keep the mapping auditable: config keys should match prompt filenames and skill names. Interactive routing may use an extension, and the resource map should document any intentional model changes between front-door prompts and worker skills.
 
 ---
 
@@ -227,7 +254,7 @@ Pi's built-in tools are:
 read, bash, edit, write, grep, find, ls
 ```
 
-For unattended agentloop subprocesses, pass an allowlist appropriate to the role:
+When a prompt, skill, or extension can restrict tools by role, use an allowlist appropriate to the work:
 
 | Role | Suggested tools |
 |------|-----------------|
@@ -247,30 +274,14 @@ pi -p --tools read,bash,grep,find,ls "Review this task without editing files"
 
 ---
 
-## agentloop Invocation
+## Interactive Execution
 
-Pi supports non-interactive print mode and JSON event mode. agentloop can invoke Pi agents with either.
+Run orchestration through the Pi front-door prompts:
 
-### Simple print mode
+- `/pm-agent <feature-or-prd> <github-issues|filesystem>` plans the work and prepares the authoritative sprint record.
+- `/team-lead <sprint-or-feature-id> <github-issues|filesystem>` executes an approved plan through the worker skills and canonical quality gates.
 
-```bash
-pi -p \
-  --no-prompt-templates \
-  --tools read,write,edit,bash,grep,find,ls \
-  --append-system-prompt "$(cat .pi/skills/backend-builder/SKILL.md)" \
-  "Execute TASK-003 from the selected state backend. Follow instructions/TEAM-ORCHESTRATION.md."
-```
-
-### JSON mode for process integration
-
-```bash
-pi --mode json \
-  --tools read,write,edit,bash,grep,find,ls \
-  --append-system-prompt "$(cat .pi/skills/backend-builder/SKILL.md)" \
-  "Execute TASK-003 from the selected state backend."
-```
-
-Use `--session-dir .agentloop/pi-sessions` if agentloop should keep Pi subprocess sessions separate from normal interactive sessions.
+The Team Lead reads each required `SKILL.md` before adopting that worker role. It returns to the coordinator role between phases and updates the selected state backend. If a project later adds an extension for isolated delegation, that extension must preserve the same worker contracts, tool restrictions, and evidence rules.
 
 ---
 
@@ -278,26 +289,26 @@ Use `--session-dir .agentloop/pi-sessions` if agentloop should keep Pi subproces
 
 Follow `TEAM-ORCHESTRATION.md`: the **user specifies** either GitHub Issues mode or filesystem mode as the state backend. Do not choose autonomously.
 
-- **GitHub Issues mode:** post progress and reports as issue comments. Use `.agentloop/tmp/` for `gh --body-file` drafts and do not commit those drafts.
+- **GitHub Issues mode:** post progress and reports as issue comments. Use `.pi/tmp/` for `gh --body-file` drafts and do not commit those drafts.
 - **Filesystem mode:** write progress and reports to `docs/sprints/`, `docs/reviews/`, and `docs/reports/` using the same markdown headings.
 
-Pi agents should preserve the selected backend across every prompt, skill, and subprocess invocation. If a subprocess prompt lacks the backend, stop and ask the coordinator to provide it rather than guessing.
+Pi prompts and skills should preserve the selected backend through every phase. If a worker contract lacks the backend, stop and ask the Team Lead to provide it rather than guessing.
 
 ---
 
 ## Extensions
 
-Use Pi extensions in `.pi/extensions/` when agentloop needs custom commands, custom tools, guardrails, model routing, or richer integration.
+Use Pi extensions in `.pi/extensions/` when the workflow needs custom commands, custom tools, guardrails, model routing, or richer integration.
 
 Useful extension ideas for this workflow:
 
 - block writes to `.env`, `node_modules`, `bin`, `obj`, and generated output directories;
 - intercept dangerous bash commands and require confirmation;
-- register helper commands such as `/agentloop-status` or `/post-agent-update`;
+- register helper commands such as `/team-status` or `/post-agent-update`;
 - add custom tools for reading/writing the selected state backend consistently;
 - route important prompts/skills to stronger models with a shared `.pi/skill-models.json` configuration.
 
-A proven Pi setup uses `.pi/extensions/skill-model-router.ts` plus `.pi/skill-models.json` so `/team-lead`, `/pm-agent`, destroyer, reviewer, tester, and specialized builders get deliberate model/thinking settings. PiLoop subprocesses should read the same routing file directly because raw RPC prompts may not trigger slash-command extension routing.
+A proven Pi setup uses `.pi/extensions/skill-model-router.ts` plus `.pi/skill-models.json` so `/team-lead`, `/pm-agent`, destroyer, reviewer, tester, and specialized builders get deliberate model/thinking settings.
 
 Extensions are TypeScript modules and can register tools via `pi.registerTool()` and commands via `pi.registerCommand()`.
 
@@ -309,4 +320,4 @@ Extensions are TypeScript modules and can register tools via `pi.registerTool()`
 - Pi skills are progressively loaded: startup includes skill names/descriptions, and the agent reads full `SKILL.md` when the task matches or the user invokes `/skill:<name>`.
 - Prompt templates are non-recursive under `.pi/prompts/`; put one template per file at that level unless configured otherwise.
 - Use `/reload` in interactive Pi after changing skills, prompt templates, extensions, or context files.
-- Add `.agentloop/tmp/`, `.agentloop/logs/`, `.agentloop/state-*.json`, and any Pi subprocess session directory to `.gitignore`.
+- Add `.pi/tmp/` and any other project-specific runtime-only directories to `.gitignore`.

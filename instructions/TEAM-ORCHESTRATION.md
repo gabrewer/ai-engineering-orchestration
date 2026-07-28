@@ -1,24 +1,35 @@
 # Team Orchestration
 
-This project uses **agentloop** — a .NET CLI in `tools/agentloop/` that orchestrates a team of AI agent subprocesses as an automated build pipeline. The goal is to minimize human involvement during execution while maximizing quality and auditability.
+This project uses a team of specialized AI roles as a structured planning and build workflow. The active AI session is the coordinator: it loads or delegates to the appropriate worker instructions, enforces quality gates, and records progress in the selected state backend.
 
-> **Trigger phrase**: Say "execute the plan" (or similar) to run the `agentloop` CLI and begin execution.
+> **Trigger phrase**: Say "execute the plan" (or similar) to start the tool's team-lead workflow.
 
-> **Prerequisite**: Agent definitions live in `agents/`. Run via `dotnet run --project tools/agentloop` from the project root, or use the compiled binary at `loop/dist/agentloop`.
-
-> **AI Tool Setup**: Agent definition format, directory paths, model names, and invocation commands vary by AI tool. See the relevant `TOOL-*.md` file in this `instructions/` directory for your tool's specific configuration.
+> **AI Tool Setup**: Agent definition format, directory paths, model names, and delegation capabilities vary by AI tool. See the relevant `TOOL-*.md` file in this `instructions/` directory for your tool's specific configuration.
 
 ---
 
 ## Philosophy
 
-The main AI session and agentloop together act as the **Team Lead**. They own the execution plan, orchestrate all agents, manage the dependency graph, and make the escalation call: small issues get auto-fixed, big ones get flagged for the human. The system starts conservative and earns more autonomy over time as breadcrumbs prove good judgment.
+The main AI session acts as the **Team Lead**. It owns the execution plan, coordinates worker roles, manages the dependency graph, and makes the escalation call: small issues get auto-fixed, big ones get flagged for the human. The system starts conservative and earns more autonomy over time as breadcrumbs prove good judgment.
+
+## Workflow Entry Points
+
+Every tool adapter must present two cohesive front doors:
+
+- `pm-agent` coordinates product design, PM work, questions, approval, and planning artifacts;
+- `team-lead` coordinates approved-plan execution, workers, quality gates, commits, reporting, and acceptance preparation.
+
+Use each tool's native representation: Pi prompt templates, Claude Code and GitHub Copilot agent files, and opencode `primary` agents. Internal phases belong in worker skills or subagents rather than requiring the user to understand the worker graph. Additional entry points are useful only when they provide a genuinely separate workflow or focused utility; their ownership must not overlap or leave gaps between planning and execution.
+
+When a tool supports native agents, the primary/default session must route planning requests to `pm-agent` and execution requests to `team-lead`. It must not imitate, collapse, or bypass these front-door agents. Each adapter must put this routing rule in the tool's always-loaded project instructions as well as defining the agents themselves.
+
+When generating orchestration resources, first show a compact map of proposed front-door agents, worker skills/subagents, and model assignments. A quick sanity check is: can a user plan and execute work through the front doors without knowing which internal worker runs each phase?
 
 ---
 
 ## The Team
 
-Every agent is defined as a file in `agents/`. The exact format (markdown with YAML frontmatter, JSON, etc.) depends on your AI tool — see the relevant `TOOL-*.md` for details. The example below shows the Claude Code format:
+Every front-door agent and worker role is defined using the active AI tool's native prompts, skills, instructions, or agent files. The exact format depends on the tool — see the relevant `TOOL-*.md` for details. The example below shows the Claude Code format:
 
 ```markdown
 ---
@@ -45,9 +56,9 @@ Expands milestones into detailed sprint briefs.
 
 Turns sprint briefs into actionable sprint plans.
 
-- Reads sprint briefs (from Product Designer) and produces structured sprint JSON files
+- Reads sprint briefs (from Product Designer) and produces structured sprint plans
 - Each Task is either **prescriptive** (specific implementation instructions) or **goal-oriented** (desired outcome, agent decides approach)
-- Writes machine-readable sprint plans to `docs/sprints/<sprint-name>-<timestamp>.json` only when agentloop requires a local plan input; execution state lives in the selected backend
+- Writes machine-readable sprint plans only when the selected workflow needs them; execution state lives in the selected backend
 - Creates or updates the selected state backend with the human-readable task board, Contract Impact Check, dependencies, and Quality Gates
 - If briefs have unresolved ambiguity, records the specific questions in the selected state backend and marks the sprint blocked/needs-input
 - Posts sprint summaries to the selected state backend after build loop execution completes
@@ -141,17 +152,17 @@ Triages destroyer findings and drives resolution.
   - `SHIP IT` — all issues resolved or acceptably low risk
   - `CHANGES NEEDED: <exact problem description>` — builder must fix specific issues (file:line references, surgical — no background context)
   - `ESCALATE: <problem description>` — requires human review
-- **If CHANGES NEEDED**: agentloop spawns a new builder subprocess to address the problems. The loop repeats up to 6 times.
+- **If CHANGES NEEDED**: the Team Lead delegates the specific remediation to the appropriate builder role. The loop repeats up to 6 times.
 - **Tools**: Read, Glob, Grep, Bash (read-only commands only)
 
 ### `git-committer`
 
 Commits all task work after the review agent approves.
 
-- Triggered automatically by agentloop after `SHIP IT`
+- Triggered by the Team Lead after `SHIP IT`
 - **Tools**: Read, Glob, Grep, Bash
 
-Logs for all agents are written to `.agentloop/logs/` keyed by run ID, task ID, and agent name. Logs are diagnostic traces; the selected state backend remains the durable source of truth for sprint/task state.
+If the active AI tool produces local session or worker logs, treat them as untracked diagnostic traces. The selected state backend remains the durable source of truth for sprint/task state.
 
 ---
 
@@ -270,7 +281,7 @@ Use this structure for a GitHub epic/sprint issue or a filesystem sprint markdow
 
 Agents write stable, searchable updates to the selected state backend.
 
-- **GitHub Issues mode:** post comments to the relevant task/epic issue. Compose long comments in temporary untracked files such as `.agentloop/tmp/<task-id>-comment.md`, then post them with `gh issue comment <issue> --body-file <file>`. Never commit these temporary files.
+- **GitHub Issues mode:** post comments to the relevant task/epic issue. Compose long comments in the tool adapter's designated temporary directory, then post them with `gh issue comment <issue> --body-file <file>`. Never commit these temporary files.
 - **Filesystem mode:** append the same markdown blocks to `docs/sprints/<sprint-id>-build.md`. Write destroy/review/test reports to the paths listed in Filesystem Mode.
 
 Use this format for task progress in either backend:
@@ -304,7 +315,7 @@ The team-lead must run the `git-committer` phase after the review-agent returns 
 
 - Completed implementation work must cite real commit SHA(s). Do not use `Commit(s): n/a` for completed code, tests, configuration, documentation deliverables, or build fixes unless the human explicitly approved a no-commit deviation.
 - If task-owned changes remain uncommitted, the sprint is not ready for acceptance verification.
-- The git-committer must separate unrelated pre-existing working-tree changes from task-owned changes and must not commit `.agentloop/tmp/`, logs, state files, or other temporary artifacts.
+- The git-committer must separate unrelated pre-existing working-tree changes from task-owned changes and must not commit tool-specific temporary files, logs, session state, or other runtime artifacts.
 - If the repository is on `main` or `master`, create/use a feature branch before committing, following the project git-safety rules.
 - Final readiness must include commit SHA(s), verification evidence, and any explicit no-commit deviations.
 
@@ -373,6 +384,8 @@ Each Task in the Sprint plan or selected-backend task board includes:
 - **Commit hint** — conventional commit message for the smallest coherent change
 - **PR slice/checkpoint** — the intended review boundary when the sprint may approach the default commit/file thresholds
 
+Plans should reference build, test, and verification paths that actually exist. In a greenfield workstream, make establishing the first real build surface an explicit task before generating downstream scripts or plans that depend on it.
+
 ### Contract Impact Check
 
 Every product sprint starts with a Contract Impact Check in the parent issue or sprint file. Treat user-visible workflow changes as full-stack by default unless explicitly marked `UI polish only`, `docs only`, or `frontend prototype only`.
@@ -410,59 +423,42 @@ BUILD LOOP (autonomous, overnight):
   refine → report
 ```
 
-Each step is either **agentic** (an AI agent subprocess does it) or **deterministic** (a shell command, always the same result).
+Each step is either **agentic** (the Team Lead performs it under a worker role or delegates it through the active tool) or **deterministic** (a shell command, always the same result).
 
 ### What is deterministic
 
-- All **git commits** — handled by the `git-committer` agent subprocess after review agent approval
+- All **git commits** — handled under the `git-committer` role after review-agent approval
 - All **verification scripts** — shell scripts defined during brainstorming, invoked after commit
 
 ### What is agentic
 
-- Domain modeling (`domain-modeler` subprocess)
-- API contract definition (`api-developer` subprocess)
-- Test writing (`test-writer` subprocess)
-- Code generation (`backend-builder` / `frontend-builder` subprocess)
-- Adversarial testing (`destroyer` subprocess)
-- Issue triage and review (`review-agent` subprocess)
-- Sprint summary (`pm` subprocess)
+- Domain modeling (`domain-modeler` role)
+- API contract definition (`api-developer` role)
+- Test writing (`test-writer` role)
+- Code generation (`backend-builder` / `frontend-builder` roles)
+- Adversarial testing (`destroyer` role)
+- Issue triage and review (`review-agent` role)
+- Sprint summary (`pm` role)
 - Brainstorming and planning (interactive, with the user)
-- Execution planning (via the AI tool's headless/non-interactive invocation, no tools — pure dependency reasoning)
+- Execution planning (performed by the Team Lead from the approved plan and dependency graph)
 - Refinement (interactive Q&A handoff)
 
 ---
 
-## How agentloop Works
+## How Execution Works
 
-The `agentloop` CLI (in `tools/agentloop/`) is the execution engine. Run it from the project root:
+Enter through the active AI tool's `team-lead` prompt or agent. The Team Lead:
 
-```bash
-dotnet run --project tools/agentloop -- build --prd <sprint-name>        # single sprint
-dotnet run --project tools/agentloop -- build --prd <sprint-name> --resume  # resume
-dotnet run --project tools/agentloop -- build --prd <sprint-name> --yes  # skip confirmation
-dotnet run --project tools/agentloop -- build --all                      # all sprints
-dotnet run --project tools/agentloop -- build --all --resume             # resume all
-dotnet run --project tools/agentloop -- plan --prd docs/PRD.md           # planning loop
-```
+1. Reads the approved sprint issue/file from the selected state backend.
+2. Builds a dependency graph and proposes the execution order for human approval when required.
+3. Executes sprints in sequence and may delegate independent tasks concurrently only when the tool supports safe isolation.
+4. Runs `domain-modeler` → `api-developer` → the per-task pipeline for each sprint.
+5. Runs `test-writer` → builder → build gate → `destroyer` → `review-agent` (up to 6 attempts) → `git-committer` for each task.
+6. Applies the Pull Request Size Checkpoint after each committed task or coherent batch.
+7. Runs sprint verification and has the `pm` role write the completion summary.
+8. Records every durable status transition and report in the selected state backend.
 
-Or use the compiled binary directly:
-
-```bash
-loop/dist/agentloop build --prd <sprint-name>
-loop/dist/agentloop build --all --resume
-```
-
-### What agentloop does
-
-1. Reads the sprint plan from `docs/sprints/<sprint-name>.json`
-2. Calls the AI tool's headless invocation command with no tools to produce a dependency graph and wave order
-3. Presents the execution plan for human approval (with optional feedback loop)
-4. Executes Sprints in sequence; tasks within a wave run in parallel
-5. For each Sprint: `domain-modeler` → `api-developer` → per-task pipeline
-6. For each task: `test-writer` → builders → `destroyer` → `review-agent` (up to 6 attempts) → `git-committer`
-7. After each committed task/batch, applies the Pull Request Size Checkpoint before starting more scope
-8. After all tasks: `pm` agent writes a sprint summary
-9. Shows a live terminal dashboard throughout
+The tool adapter may implement a role as a native subagent, a loaded skill, or a temporary role adopted by the main session. The quality gates and evidence requirements are the same in every case.
 
 ---
 
@@ -510,13 +506,13 @@ Once the user approves the plan:
 
 ---
 
-## Phase 2: Execution (agentloop CLI)
+## Phase 2: Team-Lead Execution
 
-This phase is kicked off when the user says "execute the plan" or equivalent. The AI runs the `agentloop` CLI from the project root and monitors progress.
+This phase starts when the user says "execute the plan" or invokes the tool's team-lead entry point. The active AI session reads the approved plan, coordinates the worker roles, runs deterministic gates, and records progress.
 
 ### Real-time status updates
 
-The main AI session is responsible for updating task status in the selected backend at key moments — **before** launching agentloop, not after.
+The Team Lead updates task status in the selected backend at each key transition, before starting the corresponding worker phase.
 
 **GitHub Issues mode** updates issue titles/comments:
 
@@ -561,7 +557,7 @@ For each task in the Sprint:
 
 1. **`test-writer`** — writes the repository-appropriate unit and/or integration tests required by the task's contract and risk; new-behavior tests must fail at write time, while regression tests for existing guarantees may already pass and should be recorded as resilient evidence
 2. **Builders** (`backend-builder` / `frontend-builder`) — write code until all tests pass
-3. **Build gate** — `dotnet build` must exit 0 before the destroyer runs. If it fails, the error is fed back to the builder. Code that does not compile never reaches the reviewer.
+3. **Build gate** — the repository's documented build command must exit 0 before the destroyer runs. If it fails, the error is fed back to the builder. Code that does not compile never reaches the reviewer.
 4. **`destroyer`** — adversarial testing scoped to this task's code only. Only critical/high findings are actionable. Medium/low are noted but do not block.
 5. **`review-agent`** — triages destroyer findings, routes fixes to builders, escalates big issues
 6. **`git-committer`** — commits after `SHIP IT`, then measures and reports the Pull Request Size Checkpoint
@@ -570,10 +566,10 @@ For each task in the Sprint:
 
 #### Step 4: Sprint Smoke Test
 
-After all tasks complete (before the PM summary), agentloop runs a sprint-level smoke test:
+After all tasks complete (before the PM summary), the Team Lead runs a sprint-level smoke test:
 
-1. `dotnet build <solution>` — full solution must compile clean
-2. `dotnet test <solution>` — full test suite must pass
+1. Run the repository's documented full build command — the complete build must pass.
+2. Run the repository's documented full test command — the complete automated test suite must pass.
 
 If the build fails, the sprint is flagged and the PM summary still runs (so there's a written record), but the failure is surfaced clearly. **A sprint is not considered done unless the smoke test passes.**
 
@@ -583,7 +579,7 @@ The script exits `0` on success or non-zero on failure. Failure stops the pipeli
 
 ## Phase 3: Refinement and Reporting
 
-The Refinement step is a **human-in-the-loop handoff**. After execution completes, Claude guides the user through a focused Q&A review:
+The Refinement step is a **human-in-the-loop handoff**. After execution completes, the active AI session guides the user through a focused Q&A review:
 
 - Questions are based on the actual work performed
 - The goal is quality, trust, and shipping — not scope expansion
@@ -623,7 +619,7 @@ Every agent follows the same breadcrumb format for every significant action:
 
 Low-confidence breadcrumbs are candidates for escalation. The Review Agent and Team Lead use confidence signals to calibrate the auto-fix vs. escalate threshold.
 
-Breadcrumbs are written to the agent's log output in `.agentloop/logs/`.
+Breadcrumbs are written to the selected state backend. Tool-generated session logs may contain additional diagnostics, but they are not the durable record.
 
 ---
 
@@ -660,13 +656,11 @@ Trust level is configured by the human and informed by breadcrumb review. Readin
 | Sprint briefs | `docs/sprints/<sprint>-brief.md`, GitHub issue body, or sprint file | Product Designer (plan loop) |
 | Questions | Selected state backend; optionally `docs/sprints/questions.md` for durable planning docs | Product Designer / PM (plan loop) |
 | Answers | Selected state backend; optionally `docs/sprints/answers.md` | Human |
-| Sprint plans | `docs/sprints/<sprint>.json` when agentloop needs local machine-readable input | PM (plan loop) |
+| Sprint plans | Selected state backend; optional `docs/sprints/<sprint>.json` when the workflow needs machine-readable input | PM (plan loop) |
 | Execution state | GitHub issue body/comments or `docs/sprints/<sprint-id>.md` + build log | Team Lead + all agents |
 | Destroy/review/test reports | GitHub issue comments or `docs/reviews/` / `docs/reports/` files | Destroyer / Review Agent / Tester |
-| Temporary issue bodies/comments | `.agentloop/tmp/` or tool-specific temp directory, untracked | Team Lead + agents |
+| Temporary issue bodies/comments | Tool-specific temp directory, untracked | Team Lead + agents |
 | Domain model | `docs/domain/<sprint>.md` when durable architecture output is required | Domain Modeler (build loop) |
 | API contract | `docs/api/<sprint>.md` when durable contract docs are required | API Developer (build loop) |
-| Agent definitions | `agents/` | Setup (one-time) — see `TOOL-*.md` for format |
-| agentloop CLI | `tools/agentloop/` | Setup (one-time) |
-| Run logs | `.agentloop/logs/` | Build loop |
-| Run state | `.agentloop/state-<sprint>.json` | Build loop |
+| Front-door and worker definitions | Tool-specific prompts, skills, instructions, or agent files | Setup (one-time) — see `TOOL-*.md` for format |
+| Diagnostic logs/session state | Tool-specific runtime location, untracked | Active AI tool |
