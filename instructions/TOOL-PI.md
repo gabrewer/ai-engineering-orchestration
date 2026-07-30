@@ -115,10 +115,14 @@ Use `.agents/skills/` for worker identities when you want the same skill files t
 
 ### 3. Bootstrap `AGENTS.md`
 
+During this one-time bootstrap, ask which durable orchestration backend the repository will use (`github-issues` or `filesystem`). Persist the answer in `AGENTS.md`; planning prompts and workers read it from there and must not ask again.
+
 If no repo-level context file exists, create a short `AGENTS.md` with:
 
 ```markdown
 # Project Instructions
+
+**State backend:** github-issues | filesystem
 
 - Follow the existing architecture and conventions in this repository.
 - Do not change public contracts, migrations, deployment config, or CI unless the task explicitly requires it.
@@ -128,7 +132,7 @@ If no repo-level context file exists, create a short `AGENTS.md` with:
 - Apply the pull-request size checkpoints from `instructions/TEAM-ORCHESTRATION.md`; recommend review before branch scope becomes difficult to audit.
 ```
 
-If `AGENTS.md` or `CLAUDE.md` already exists, append only the Pi orchestration deltas and keep the existing project rules authoritative.
+Replace the placeholder with the user's choice. If `AGENTS.md` or the harness-equivalent repo context file already exists, append the single selected marker and only the Pi orchestration deltas; keep the existing project rules authoritative. If agents were installed previously without a marker, ask once on the next setup/planning run and persist it immediately.
 
 ### 4. Create worker skills from the project context
 
@@ -142,10 +146,10 @@ description: Builds backend code for one assigned task in this repository. Use w
 
 # Backend Builder
 
-Read `AGENTS.md`, `instructions/TEAM-ORCHESTRATION.md`, the sprint issue/file, and the files named in the task before editing. Follow the repository's existing backend architecture and verification commands. Never modify tests unless this task explicitly assigns test work.
+Use the automatically loaded repository instructions, then read `instructions/TEAM-ORCHESTRATION.md`, the sprint issue/file, and the files named in the task before editing. Follow the repository's existing backend architecture and verification commands. Never modify tests unless this task explicitly assigns test work.
 ```
 
-Keep the first version conservative. Prefer narrow, repository-specific instructions over broad generic agent personas.
+Keep the first version conservative. Prefer narrow, repository-specific instructions over broad generic agent personas. Every generated worker skill and plain agent prompt must include a short rule to reuse the state backend from automatically loaded repository instructions without prompting, and to report incomplete initialization to the coordinator if it is absent. Do not copy the selected value into each agent, require a separate `AGENTS.md` read, or limit this knowledge to `/pm-agent` and `/team-lead`.
 
 ### 5. Create the two front-door prompts
 
@@ -154,7 +158,7 @@ Install both:
 - `.pi/prompts/pm-agent.md` — converts a PRD/spec into an audited sprint issue/file.
 - `.pi/prompts/team-lead.md` — executes an approved sprint through worker skills and quality gates.
 
-Both prompts must name exact files to read first, the selected state backend, temp-file paths, quality-gate headings, verification commands, and the rule that acceptance verification is prepared for a human rather than self-approved.
+Both prompts must use the automatically loaded repo-level instructions containing the persisted state backend, name any additional files to read first, and include temp-file paths, quality-gate headings, verification commands, and the rule that acceptance verification is prepared for a human rather than self-approved. They must resolve the backend from repository context rather than accepting it as a routine prompt argument or spending a separate tool call to reload `AGENTS.md`.
 
 Before creating prompts and skills, present a concise resource map showing each prompt, the worker skills it coordinates, and the proposed provider/model/thinking assignment. This is a design review, not a requirement to forbid additional prompts.
 
@@ -198,11 +202,11 @@ Example:
 
 ```markdown
 ---
-description: Plan a sprint using the user-selected state backend
-argument-hint: "<feature-or-prd> <github-issues|filesystem>"
+description: Plan a sprint using the repository's configured state backend
+argument-hint: "<feature-or-prd>"
 ---
 
-Plan a sprint for $1 using state backend $2. Follow instructions/TEAM-ORCHESTRATION.md.
+Use the configured state backend from the automatically loaded repository instructions. Plan a sprint for $1 and follow instructions/TEAM-ORCHESTRATION.md. Do not ask for the backend when it is configured.
 ```
 
 Templates support `$1`, `$2`, `$@`, and related positional argument forms.
@@ -212,7 +216,7 @@ Templates support `$1`, `$2`, `$@`, and related positional argument forms.
 Use the Lessi.App sequence-parity workflow as the target quality bar for generated Pi prompt templates:
 
 - **Read-before-write list**: name exact standards, spec files, source areas, tests, and existing issue comments to read before planning or execution.
-- **Single source of truth**: state whether GitHub Issues or filesystem is authoritative. In GitHub mode, prefer one umbrella/control sprint issue with comments/checklists when the human wants to avoid issue sprawl.
+- **Single source of truth**: read the repository's persisted backend marker and state whether GitHub Issues or filesystem is authoritative; do not make it a per-run choice. In GitHub mode, prefer one umbrella/control sprint issue with comments/checklists when the human wants to avoid issue sprawl.
 - **Full-stack default**: require a Contract Impact Check before tasking. Frontend-only is allowed only when explicitly marked `UI polish only`, `docs only`, or `frontend prototype only`.
 - **No state tunneling**: forbid production behavior that hides structured domain state in free-text fields such as `notes`, `description`, `metadataJson`, or local/session storage when a typed API contract is required.
 - **Write-side validation**: if typed IDs link persisted resources, require create/update paths to reject malformed, nonexistent, deleted, cross-user/tenant, and invalid child-item references before persistence.
@@ -278,8 +282,8 @@ pi -p --tools read,bash,grep,find,ls "Review this task without editing files"
 
 Run orchestration through the Pi front-door prompts:
 
-- `/pm-agent <feature-or-prd> <github-issues|filesystem>` plans the work and prepares the authoritative sprint record.
-- `/team-lead <sprint-or-feature-id> <github-issues|filesystem>` executes an approved plan through the worker skills and canonical quality gates.
+- `/pm-agent <feature-or-prd>` plans the work with the repository's configured state backend and prepares the authoritative sprint record.
+- `/team-lead <sprint-or-feature-id>` executes an approved plan with the configured state backend through the worker skills and canonical quality gates.
 
 The Team Lead reads each required `SKILL.md` before adopting that worker role. It returns to the coordinator role between phases and updates the selected state backend. If a project later adds an extension for isolated delegation, that extension must preserve the same worker contracts, tool restrictions, and evidence rules.
 
@@ -287,12 +291,12 @@ The Team Lead reads each required `SKILL.md` before adopting that worker role. I
 
 ## State Backend Rules
 
-Follow `TEAM-ORCHESTRATION.md`: the **user specifies** either GitHub Issues mode or filesystem mode as the state backend. Do not choose autonomously.
+Follow `TEAM-ORCHESTRATION.md`: the user chooses GitHub Issues mode or filesystem mode once during repository agent initialization, and setup persists that choice in `AGENTS.md` (or the harness-equivalent committed context file). Do not choose autonomously or request the choice on each run.
 
 - **GitHub Issues mode:** post progress and reports as issue comments. Use `.pi/tmp/` for `gh --body-file` drafts and do not commit those drafts.
 - **Filesystem mode:** write progress and reports to `docs/sprints/`, `docs/reviews/`, and `docs/reports/` using the same markdown headings.
 
-Pi prompts and skills should preserve the selected backend through every phase. If a worker contract lacks the backend, stop and ask the Team Lead to provide it rather than guessing.
+Pi prompts and skills use the configured backend from the automatically loaded repository instructions through every phase. A missing worker argument is not a reason to ask the user again. If the persisted marker itself is absent, report incomplete setup to the Team Lead so the one-time initialization can be completed.
 
 ---
 

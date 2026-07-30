@@ -168,20 +168,26 @@ If the active AI tool produces local session or worker logs, treat them as untra
 
 ## State Tracking Backend
 
-The **user specifies** one durable state backend before planning begins:
+The durable state backend is a **repository-level setup choice**, not a per-plan choice. Ask the user once while installing or initializing the repo's agents:
 
-1. **GitHub Issues mode** — use when the user asks for GitHub-backed planning/tracking, issue comments, or remote team auditability.
-2. **Filesystem mode** — use when the user asks for local files, markdown/JSON plans, offline/private tracking, or no GitHub dependency.
+1. **GitHub Issues mode** — use for GitHub-backed planning/tracking, issue comments, and remote team auditability.
+2. **Filesystem mode** — use for local markdown/JSON plans, offline/private tracking, or no GitHub dependency.
 
-Do **not** choose or infer the backend autonomously. If the user has not specified `github-issues` or `filesystem`, ask which backend to use before creating planning artifacts.
-
-The user-selected backend is the **source of truth** for execution state. All sprint/task progress, agent updates, adversarial findings, review verdicts, test reports, decisions, and completion summaries are tracked there in real time — not in batches.
-
-Record the user's choice in the plan header, sprint file, or epic issue:
+Do **not** choose or infer the backend autonomously. Persist the answer in the repo-level agent instruction file (`AGENTS.md` or the harness-equivalent committed context file) using exactly one of these markers:
 
 ```markdown
-**State backend:** github-issues | filesystem
+**State backend:** github-issues
 ```
+
+```markdown
+**State backend:** filesystem
+```
+
+Planning, execution, skills, and subprocesses must reuse that persisted setting from the repository instructions automatically loaded by the harness. They must not ask the user to choose again when the marker exists or spend a separate tool call re-reading `AGENTS.md` when its content is already in context. Every generated agent definition, worker skill, and human-facing prompt (including PM and team-lead prompts) must carry a short resolution rule; do not copy the selected value into every agent or rely on only the top-level coordinator knowing it. If a worker receives no backend argument, it uses the repository context instead of asking the user.
+
+If an already-initialized repository has no marker, treat that as incomplete setup: ask once, persist the answer before creating planning artifacts, and use it thereafter. A user may explicitly request a repository-wide backend change; update the marker, but do not move an active sprint between backends without a separate migration plan.
+
+The configured backend is the **source of truth** for execution state. All sprint/task progress, agent updates, adversarial findings, review verdicts, test reports, decisions, and completion summaries are tracked there in real time — not in batches. Copy the configured marker into each sprint file or epic issue as a self-contained record; this is documentation, not another choice prompt.
 
 ### GitHub Issues Mode
 
@@ -414,7 +420,7 @@ Two separate loops with a human review gate between them:
 ```
 PLANNING LOOP (interactive, daytime):
   product-designer → pm → questions? → human answers → re-run
-  Output: selected state backend (GitHub issues or docs/sprints files) + optional docs/sprints/<sprint>.json machine plan
+  Output: configured repository state backend (GitHub issues or docs/sprints files) + optional docs/sprints/<sprint>.json machine plan
 
   ↓ human reviews plans ↓
 
@@ -489,9 +495,9 @@ Once the user approves the plan, the skill runs a **preflight check** before cre
 Once the user approves the plan:
 
 - Create a **feature branch** locally
-- Confirm the user-specified **state backend**: GitHub Issues or filesystem. If absent, ask before proceeding.
+- Read the persisted **state backend** from the repo-level agent instructions. Do not prompt again when it is configured; if the marker is absent, complete the one-time repository setup and persist it before proceeding.
 - Create a **plan document** at `/docs/plans/<feature-name>.md` only if the plan is a durable deliverable.
-- Create the authoritative sprint/epic record in the user-selected backend:
+- Create the authoritative sprint/epic record in the configured backend:
   - **GitHub Issues mode:** create an epic issue with tasks grouped into second-level headers with emoji.
   - **Filesystem mode:** create `docs/sprints/<sprint-id>.md` using the same structure.
   - Include a Contract Impact Check before the task board.

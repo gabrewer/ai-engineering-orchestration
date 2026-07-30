@@ -42,6 +42,8 @@ Before installing assets, inspect:
 If absent, PiLoop should help create one.
 If present, PiLoop should treat it as the source of truth.
 
+As part of this one-time initialization, ask the owner to choose `github-issues` or `filesystem` as the durable state backend. Persist the answer in `AGENTS.md` (or the harness-equivalent committed repo context) as `**State backend:** <choice>`. Existing repositories that already have PiLoop assets but lack this marker are migrated by asking once and persisting the answer; planning must not ask again afterward.
+
 The file should capture:
 - current architecture
 - repo-specific constraints
@@ -116,6 +118,7 @@ The first successful adoption target is planning mode.
 
 Planning mode should prove:
 - Pi can launch correctly in this repo
+- the persisted repository state backend is resolved without another user prompt
 - prompts and skills resolve correctly
 - sprint docs can be written safely
 - GitHub issue creation works for this repo
