@@ -11,15 +11,32 @@ public static class PiLoopTemplateInstaller
 
         await WriteIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "skill-models.json"), SkillModelsJson, overwrite);
         await WriteIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "extensions", "skill-model-router.ts"), SkillModelRouterExtension, overwrite);
-        await WriteIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "prompts", "product-designer.md"), ProductDesignerPrompt, overwrite);
-        await WriteIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "prompts", "pm.md"), PmPrompt, overwrite);
-        await WriteIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "prompts", "test-writer.md"), TestWriterPrompt, overwrite);
-        await WriteIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "prompts", "backend-builder.md"), BackendBuilderPrompt, overwrite);
-        await WriteIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "prompts", "frontend-builder.md"), FrontendBuilderPrompt, overwrite);
-        await WriteIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "prompts", "domain-modeler.md"), DomainModelerPrompt, overwrite);
-        await WriteIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "prompts", "api-developer.md"), ApiDeveloperPrompt, overwrite);
-        await WriteIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "prompts", "destroyer.md"), DestroyerPrompt, overwrite);
-        await WriteIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "prompts", "review-agent.md"), ReviewAgentPrompt, overwrite);
+        await WritePromptIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "prompts", "product-designer.md"), ProductDesignerPrompt, overwrite);
+        await WritePromptIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "prompts", "pm.md"), PmPrompt, overwrite);
+        await WritePromptIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "prompts", "test-writer.md"), TestWriterPrompt, overwrite);
+        await WritePromptIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "prompts", "backend-builder.md"), BackendBuilderPrompt, overwrite);
+        await WritePromptIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "prompts", "frontend-builder.md"), FrontendBuilderPrompt, overwrite);
+        await WritePromptIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "prompts", "domain-modeler.md"), DomainModelerPrompt, overwrite);
+        await WritePromptIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "prompts", "api-developer.md"), ApiDeveloperPrompt, overwrite);
+        await WritePromptIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "prompts", "destroyer.md"), DestroyerPrompt, overwrite);
+        await WritePromptIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "prompts", "review-agent.md"), ReviewAgentPrompt, overwrite);
+    }
+
+    private static async Task WritePromptIfMissingAsync(string path, string prompt, bool overwrite)
+    {
+        if (File.Exists(path) && !overwrite)
+        {
+            var existingPrompt = await File.ReadAllTextAsync(path);
+            if (existingPrompt.Contains("## Repository orchestration configuration", StringComparison.Ordinal))
+                return;
+
+            await File.WriteAllTextAsync(
+                path,
+                AddRepositoryConfigurationRules(existingPrompt).Trim() + Environment.NewLine);
+            return;
+        }
+
+        await WriteIfMissingAsync(path, AddRepositoryConfigurationRules(prompt), overwrite);
     }
 
     private static async Task WriteIfMissingAsync(string path, string content, bool overwrite)
@@ -30,6 +47,28 @@ public static class PiLoopTemplateInstaller
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         await File.WriteAllTextAsync(path, content.Trim() + Environment.NewLine);
     }
+
+    private static string AddRepositoryConfigurationRules(string prompt)
+    {
+        const string lfFrontmatterEnd = "---\n\n";
+        const string crlfFrontmatterEnd = "---\r\n\r\n";
+        var frontmatterEnd = prompt.Contains(crlfFrontmatterEnd, StringComparison.Ordinal)
+            ? crlfFrontmatterEnd
+            : lfFrontmatterEnd;
+        var insertionPoint = prompt.IndexOf(frontmatterEnd, StringComparison.Ordinal);
+        if (insertionPoint < 0)
+            throw new InvalidOperationException("Generated Pi prompts must contain YAML frontmatter.");
+
+        insertionPoint += frontmatterEnd.Length;
+        return prompt.Insert(insertionPoint, RepositoryConfigurationRules + Environment.NewLine);
+    }
+
+    private const string RepositoryConfigurationRules = """
+## Repository orchestration configuration
+
+Use the `State backend` already supplied by the repository instructions as the sole source of truth. Never ask the user to choose again when it is configured, and never duplicate state into the other backend. If it is missing or invalid, report blocked setup to the coordinator so initialization can persist it once.
+
+""";
 
     private const string SkillModelsJson = """
 {

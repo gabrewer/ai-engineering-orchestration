@@ -27,6 +27,8 @@ Required minimum state:
 - human owner decides the product/app purpose
 
 ### Step 2 — Add a project-level `TEAM-ORCHESTRATION.md`
+During this one-time initialization, ask the owner to choose `github-issues` or `filesystem` as the durable state backend. Persist the answer in `AGENTS.md` (or the harness-equivalent committed repo context) as `**State backend:** <choice>`. All planning and execution prompts read that setting instead of asking again.
+
 Write a project-specific orchestration brief that describes:
 - product/domain context
 - architecture constraints
@@ -66,6 +68,7 @@ PiLoop does not invent the product vision by default; it expects the human or a 
 Run PiLoop planning against the PRD.
 
 Planning mode should:
+- resolve the repository's persisted state backend without another choice prompt
 - create sprint briefs
 - create sprint plan JSON artifacts
 - raise questions if ambiguity blocks planning
