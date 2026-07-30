@@ -17,6 +17,7 @@ Example:
 {
   "team-lead": { "provider": "openai-codex", "model": "gpt-5.5", "thinkingLevel": "high" },
   "pm-agent": { "provider": "openai-codex", "model": "gpt-5.5", "thinkingLevel": "medium" },
+  "pr-agent": { "provider": "openai-codex", "model": "gpt-5.5", "thinkingLevel": "high" },
   "destroyer": { "provider": "openai-codex", "model": "gpt-5.5", "thinkingLevel": "high" },
   "reviewer": { "provider": "openai-codex", "model": "gpt-5.5", "thinkingLevel": "high" },
   "tester": { "provider": "openai-codex", "model": "gpt-5.4", "thinkingLevel": "medium" },
@@ -25,7 +26,7 @@ Example:
 }
 ```
 
-Lesson learned: route orchestration and quality-gate roles deliberately. `/team-lead`, destroyer, and reviewer need stronger reasoning than routine builders because they decide whether evidence is sufficient, whether to remediate, and when to escalate.
+Lesson learned: route orchestration and quality-gate roles deliberately. `/team-lead`, `/pr-agent`, destroyer, and reviewer need stronger reasoning than routine builders because they decide whether cumulative evidence is sufficient, whether to remediate, and when to escalate.
 
 ## Prompt-level model
 

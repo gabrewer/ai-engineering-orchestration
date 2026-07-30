@@ -1,6 +1,6 @@
 # Standalone Pull Request Agent Workflow PRD
 
-**Status:** Proposed for later implementation
+**Status:** Pi prompt/skill adapter implemented; provider-neutral CLI automation remains future work
 
 **Product area:** PiLoop / harness-independent orchestration
 
@@ -259,9 +259,9 @@ PR Agent must not rewrite history or perform the split automatically in the init
 
 ## State and Evidence
 
-The existing user-selected state backend remains authoritative:
+The repository's persisted state backend remains authoritative:
 
-- **GitHub Issues mode:** PR Agent posts or links readiness/remediation updates in the relevant issue and stores temporary body drafts under `.agentloop/tmp/` or the harness-specific ignored temp path.
+- **GitHub Issues mode:** PR Agent posts or links authorized readiness/remediation updates in the relevant issue and stores temporary body drafts under the harness-specific ignored temp path (for Pi, `.pi/tmp/`).
 - **Filesystem mode:** PR Agent writes durable readiness/remediation artifacts only to the repository-defined state paths.
 
 The PR itself is a review surface, not the sole execution ledger.
@@ -352,16 +352,16 @@ All mutating provider calls require the mode-specific authorization described ab
 
 ### Pi adapter
 
-Pi should expose a thin `.pi/prompts/pr-agent.md` front door and a reusable `.agents/skills/pr-agent/SKILL.md` or equivalent role definition. The prompt must load the canonical PR workflow rather than duplicating policy.
+Pi exposes a thin `.pi/prompts/pr-agent.md` front door and a reusable `.agents/skills/pr-agent/SKILL.md` role definition. The prompt loads the skill rather than duplicating policy. PiLoop initialization generates both resources and adds `pr-agent` to the shared model-routing configuration.
 
 Other tool adapters should map the same modes and permissions into their native command/agent formats.
 
 ## Acceptance Criteria
 
-- [ ] PR Agent is separately invoked and never runs automatically as part of team-lead.
-- [ ] Prepare mode performs no local or remote mutation.
-- [ ] Open mode cannot push or create a PR without explicit user authorization.
-- [ ] No mode can merge a PR.
+- [x] PR Agent is separately invoked and never runs automatically as part of team-lead.
+- [x] Prepare mode performs no local or remote mutation by contract.
+- [x] Open mode cannot push or create a PR without explicit user authorization by contract.
+- [x] No mode can merge a PR by contract.
 - [ ] Existing PR base/head/state are detected correctly when available.
 - [ ] Commit/file counts and checkpoint status match git/provider truth.
 - [ ] Strong checkpoint prevents the workflow from recommending additional unreviewed scope without a human decision.
