@@ -4,12 +4,13 @@ This file describes how to configure the team-orchestration workflow for **Pi** 
 
 ## Prompt and Skill Topology
 
-The Pi workflow has two required front doors:
+The Pi workflow has two delivery front doors and one separately invoked review front door:
 
 - `/pm-agent` owns the end-to-end planning experience.
 - `/team-lead` owns the end-to-end execution experience.
+- `/pr-agent` owns pull-request preparation, authorized opening/refresh, cumulative review, and human merge-readiness reporting.
 
-Worker specialization belongs primarily in skills loaded by those prompts. Avoid mechanically turning every internal phase into another prompt, but allow additional prompts when they represent a clear standalone workflow or useful operator command. Before generating project resources, show the proposed prompt-to-skill map and confirm that planning and execution remain understandable without exposing orchestration internals to the user.
+Worker specialization belongs primarily in skills loaded by those prompts. `/pr-agent` is intentionally separate: Team Lead never invokes it automatically, and invoking it never implies permission to push, edit provider state, or merge. Avoid mechanically turning every internal phase into another prompt, but allow additional prompts when they represent a clear standalone workflow or useful operator command. Before generating project resources, show the proposed prompt-to-skill map and confirm that planning, execution, and cumulative PR review remain understandable without exposing orchestration internals to the user.
 
 Project-specific guidance may specialize this topology. Treat a change to front-door ownership as an intentional design decision, not an accidental consequence of a generated blueprint.
 
@@ -95,7 +96,8 @@ AGENTS.md                         # Repo-wide Pi instructions; create only if ab
   prompts/
     pm-agent.md                   # planning front door
     team-lead.md                  # execution/build-loop front door
-    pr-checkpoint.md               # on-demand branch growth / PR boundary report
+    pr-agent.md                   # standalone PR lifecycle/review front door
+    pr-checkpoint.md              # on-demand branch growth / PR boundary report
 .agents/
   skills/
     product-designer/SKILL.md
@@ -109,6 +111,7 @@ AGENTS.md                         # Repo-wide Pi instructions; create only if ab
     review-agent/SKILL.md
     tester/SKILL.md
     git-committer/SKILL.md
+    pr-agent/SKILL.md
 .pi/tmp/                          # temporary drafts only; ignored
 ```
 
@@ -154,14 +157,15 @@ Use the automatically loaded repository instructions, then follow `instructions/
 
 Keep the first version conservative. Prefer narrow, repository-specific instructions over broad generic agent personas. Every generated worker skill and plain agent prompt must include a short rule to reuse the state backend from automatically loaded repository instructions without prompting, and to report incomplete initialization to the coordinator if it is absent. Do not copy the selected value into each agent, require a separate `AGENTS.md` read, or limit this knowledge to `/pm-agent` and `/team-lead`.
 
-### 5. Create the two front-door prompts
+### 5. Create the front-door prompts
 
-Install both:
+Install all three:
 
 - `.pi/prompts/pm-agent.md` — converts a PRD/spec into an audited sprint issue/file.
 - `.pi/prompts/team-lead.md` — executes an approved sprint through worker skills and quality gates.
+- `.pi/prompts/pr-agent.md` — prepares, opens, refreshes, and cumulatively reviews a pull request through `.agents/skills/pr-agent/SKILL.md`.
 
-Both prompts must use the automatically loaded repo-level instructions containing the persisted state backend, name any additional files to read first, and include temp-file paths, quality-gate headings, verification commands, and the rule that acceptance verification is prepared for a human rather than self-approved. They must resolve the backend from repository context rather than accepting it as a routine prompt argument or spending a separate tool call to reload `AGENTS.md`.
+All prompts must use the automatically loaded repo-level instructions containing the persisted state backend, name any additional files to read first, and include their permission boundaries and deterministic verification requirements. They must resolve the backend from repository context rather than accepting it as a routine prompt argument or spending a separate tool call to reload `AGENTS.md`. PM and Team Lead must preserve the canonical acceptance-verification rules. PR Agent must remain separately invoked, default to read-only `prepare`, require explicit confirmation for every remote mutation, review the complete base-to-head diff, and never merge.
 
 The generated `/pm-agent` prompt must record scope, exclusions, acceptance criteria, dependencies, applicability classifications, required specialist phases, and verification expectations in the approved sprint manifest. The generated `/team-lead` prompt must treat that manifest as the planning handoff contract: perform an execution-readiness preflight, then execute the recorded decisions without repeating PM analysis or adding speculative work. It may return an affected task to planning only under the canonical conditions in `TEAM-ORCHESTRATION.md`.
 
@@ -201,7 +205,7 @@ Pi prompt templates live in `.pi/prompts/*.md` and become slash commands in inte
 
 High-quality project workflows should use **thin, project-specific front-door prompts** rather than generic agent invocations. A good `/pm-agent` prompt reads the design/spec, audits source, creates the authoritative sprint issue/file, and defines the task quality bar. A good `/team-lead` prompt runs the build loop itself, loading worker skills by path at each phase and enforcing the canonical gates from `TEAM-ORCHESTRATION.md` before completion.
 
-Use worker skills for internal phases by default. Add another prompt when it gives the user a distinct workflow or operator utility, and state how it relates to the two primary front doors.
+Use worker skills for internal phases by default. `/pr-agent` qualifies as a separate front door because cumulative PR review and provider-side authorization are distinct from planning and implementation. Add any other prompt only when it gives the user a distinct workflow or operator utility, and state how it relates to the three front doors.
 
 Example:
 
@@ -241,8 +245,9 @@ Use the Lessi.App sequence-parity workflow as the target quality bar for generat
 For this orchestration style, install at least:
 
 ```text
-.pi/prompts/pm-agent.md      # spec/design → audited sprint issue/file
-.pi/prompts/team-lead.md     # sprint issue/file → build loop + gates + final summary + acceptance checklist
+.pi/prompts/pm-agent.md       # spec/design → audited sprint issue/file
+.pi/prompts/team-lead.md      # sprint issue/file → build loop + gates + final summary + acceptance checklist
+.pi/prompts/pr-agent.md       # branch/PR → prepare/open/refresh/cumulative review + human readiness
 .pi/prompts/pr-checkpoint.md  # branch/base → commits/files + review-boundary recommendation
 ```
 
@@ -291,8 +296,9 @@ Run orchestration through the Pi front-door prompts:
 
 - `/pm-agent <feature-or-prd>` plans the work with the repository's configured state backend and prepares the authoritative sprint record.
 - `/team-lead <sprint-or-feature-id>` executes an approved plan with the configured state backend through the worker skills and canonical quality gates.
+- `/pr-agent [prepare|open|refresh|review] [branch|issue|PR] [draft|ready]` runs the standalone PR lifecycle and cumulative review workflow; mode defaults to read-only `prepare`.
 
-The Team Lead reads each required `SKILL.md` before adopting that worker role. It returns to the coordinator role between phases and updates the selected state backend. If a project later adds an extension for isolated delegation, that extension must preserve the same worker contracts, tool restrictions, and evidence rules.
+The Team Lead reads each required `SKILL.md` before adopting that worker role. PR Agent loads `.agents/skills/pr-agent/SKILL.md`, remains outside Team Lead execution, and requires explicit confirmation before push, PR creation/editing, or durable provider updates. Neither workflow may merge a PR. If a project later adds an extension for isolated delegation, that extension must preserve the same worker contracts, tool restrictions, and evidence rules.
 
 ---
 
@@ -319,7 +325,7 @@ Useful extension ideas for this workflow:
 - add custom tools for reading/writing the selected state backend consistently;
 - route important prompts/skills to stronger models with a shared `.pi/skill-models.json` configuration.
 
-A proven Pi setup uses `.pi/extensions/skill-model-router.ts` plus `.pi/skill-models.json` so `/team-lead`, `/pm-agent`, destroyer, reviewer, tester, and specialized builders get deliberate model/thinking settings.
+A proven Pi setup uses `.pi/extensions/skill-model-router.ts` plus `.pi/skill-models.json` so `/team-lead`, `/pm-agent`, `/pr-agent`, destroyer, reviewer, tester, and specialized builders get deliberate model/thinking settings.
 
 Extensions are TypeScript modules and can register tools via `pi.registerTool()` and commands via `pi.registerCommand()`.
 

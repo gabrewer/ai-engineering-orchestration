@@ -11,6 +11,8 @@ public static class PiLoopTemplateInstaller
 
         await WriteIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "skill-models.json"), SkillModelsJson, overwrite);
         await WriteIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "extensions", "skill-model-router.ts"), SkillModelRouterExtension, overwrite);
+        await WritePromptIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "prompts", "pr-agent.md"), PrAgentPrompt, overwrite);
+        await WriteIfMissingAsync(Path.Combine(targetRoot.FullName, ".agents", "skills", "pr-agent", "SKILL.md"), PrAgentSkill, overwrite);
         await WritePromptIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "prompts", "product-designer.md"), ProductDesignerPrompt, overwrite);
         await WritePromptIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "prompts", "pm.md"), PmPrompt, overwrite);
         await WritePromptIfMissingAsync(Path.Combine(targetRoot.FullName, ".pi", "prompts", "test-writer.md"), TestWriterPrompt, overwrite);
@@ -76,6 +78,7 @@ Use the `State backend` already supplied by the repository instructions as the s
 
   "product-designer": { "provider": "openai-codex", "model": "gpt-5.5", "thinkingLevel": "medium" },
   "pm":               { "provider": "openai-codex", "model": "gpt-5.5", "thinkingLevel": "medium" },
+  "pr-agent":         { "provider": "openai-codex", "model": "gpt-5.5", "thinkingLevel": "high" },
 
   "test-writer":      { "provider": "openai-codex", "model": "gpt-5.4", "thinkingLevel": "medium" },
   "backend-builder":  { "provider": "openai-codex", "model": "gpt-5.4", "thinkingLevel": "medium" },
@@ -160,6 +163,85 @@ export default function (pi: ExtensionAPI) {
     return { action: "continue" };
   });
 }
+""";
+
+    private const string PrAgentPrompt = """
+---
+description: Prepare, open, refresh, or cumulatively review a pull request
+argument-hint: "[prepare|open|refresh|review] [branch|issue|PR] [draft|ready]"
+---
+
+Load and follow `.agents/skills/pr-agent/SKILL.md` before taking any action.
+
+Run PR Agent mode `${1:-prepare}` for `${2:-the current branch or its pull request}`. Treat `${3:-draft}` as the requested PR state only in `open` mode. `prepare` is the safe default. Preserve the skill's authorization boundaries, perform the cumulative base-to-head review cycle, and never merge or close a pull request.
+""";
+
+    private const string PrAgentSkill = """
+---
+name: pr-agent
+description: Safely prepares, opens, refreshes, and cumulatively reviews pull requests. Use for PR readiness, PR creation, CI/review feedback, and human merge-readiness assessment.
+---
+
+# Pull Request Agent
+
+You own the pull-request lifecycle after implementation; you do not replace PM planning or Team Lead execution. Use the configured repository `State backend` as the durable evidence source. The pull request is a review surface, not the execution ledger.
+
+## Modes and permissions
+
+- `prepare` (default) is read-only. Do not edit files, commit, push, create/edit a PR, or post comments.
+- `open` may push the current feature branch and create a draft or ready PR only after showing the exact side effects and receiving explicit confirmation. Never push `main`/`master`, use plain `--force`, or create a ready PR with blockers or failing required checks.
+- `refresh` compares the current PR body with branch truth. Editing the PR body or posting evidence requires explicit confirmation.
+- `review` is read-only for source and PR metadata. Posting a remediation/readiness update requires explicit confirmation.
+- No mode may merge or close a PR, dismiss review conversations, close issues, apply final disposition labels, rewrite history, or implement fixes.
+
+## Common inspection
+
+Before any verdict:
+
+1. Verify the repository, current branch, clean/staged/untracked state, remotes, and provider authentication.
+2. Detect an existing PR and use its actual base/head. Otherwise use the configured mainline and merge base.
+3. Measure base-to-`HEAD` commits and unique changed files. Report `BELOW`, `ADVISORY` (8 commits or 30 files), or `STRONG` (15 commits or 60 files), unless repository instructions override the thresholds.
+4. Read the complete base-to-`HEAD` commit list and diff. Identify unrelated scope, temporary artifacts, generated noise, secrets risk, and uncommitted task-owned work.
+5. Read linked issues/specifications and available Team Lead evidence from the configured state backend. Do not treat task-level PASS results as cumulative PR approval.
+6. Inventory changed public contracts, endpoints, persistence/migrations, authentication/authorization/ownership/tenancy boundaries, deployment/configuration, frontend/accessibility behavior, and runtime dependencies.
+
+At `STRONG`, recommend stopping scope growth and propose concrete independent or stacked slices. Do not rewrite history or split automatically.
+
+## Review cycle
+
+For `review`, and before recommending a ready PR in `open` or `refresh`:
+
+1. Establish branch/base/PR truth and list every coherent changed concern.
+2. Map linked acceptance criteria to cumulative diff and evidence.
+3. Inspect the full diff for correctness, security, integration, rejection/no-mutation paths, concurrency, deployment topology, accessibility, and release risk where applicable.
+4. Run or verify the repository's documented build, test, lint, and targeted runtime/browser checks when safe. Mark missing required evidence `NOT CHECKED`; it blocks readiness unless a human explicitly accepts the gap.
+5. Collect required CI checks, review summaries, inline comments, and unresolved conversations. Give each actionable finding a stable identifier, severity, file/context, requested outcome, owning role, and required verification.
+6. Reassess the complete affected area after material remediation; do not verify only the edited line or latest commit.
+
+Return exactly one cumulative verdict:
+
+- `READY FOR HUMAN REVIEW` — cumulative review is sound enough to request human review, but merge conditions are not all proven.
+- `CHANGES REQUIRED` — actionable blockers or failed required checks exist.
+- `HUMAN DECISION REQUIRED` — scope, risk, accepted gaps, or split decisions exceed agent authority.
+- `READY FOR HUMAN MERGE` — only when cumulative review passes, required checks pass, blocker conversations are resolved or explicitly accepted, and remaining manual verification is listed. State explicitly that you did not merge.
+
+## PR body contract
+
+Generate or assess these sections: Summary; Scope and exclusions; Linked issues/specs; Contract and security impact; What changed; Verification with exact commands/results; Accessibility; Known gaps/blockers; Deployment/release notes; Human review checklist. Never include secrets, customer data, tokens, session identifiers, or temporary local paths.
+
+## Required report
+
+Start with a concise verdict and then include:
+
+- `## Pull Request Context` — URL if any, base/head, working tree, commits/files, checkpoint.
+- `## Cumulative Scope Review` — concerns and acceptance mapping.
+- `## Checks and Evidence` — pass/fail/`NOT CHECKED`, with exact evidence.
+- `## Review Feedback` — stable finding IDs and unresolved conversations.
+- `## Risks and Blockers` — warnings, accepted gaps, deployment blockers.
+- `## Recommended Next Action` — exact human or remediation step.
+- `## Proposed Pull Request` — title/body in prepare/open/refresh when applicable.
+
+Use text labels in addition to color or emoji. Compose temporary GitHub bodies under the harness-specific ignored temp directory. Record durable updates only in the configured state backend and only when the selected mode plus explicit authorization permits it.
 """;
 
     private const string ProductDesignerPrompt = """

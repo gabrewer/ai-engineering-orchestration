@@ -65,7 +65,7 @@ Select the tool or tools the project will use, such as Claude Code, GitHub Copil
 - install or generate its native project files and entry points;
 - configure the required model, delegation, permissions, and tool access;
 - add the tool's always-loaded project instructions; and
-- verify that `pm-agent` handles planning and `team-lead` handles execution.
+- verify that `pm-agent` owns planning, `team-lead` owns execution, and a configured `pr-agent` is separately invoked for pull-request lifecycle and review.
 
 If the selected tool has no adapter, add one before generating project agents. Tool adapters define native setup and delegation; shared worker behavior and orchestration remain defined by the canonical instructions.
 
@@ -131,7 +131,7 @@ Before writing native files, show a compact map of the proposed team containing:
 
 | Area | Required detail |
 |---|---|
-| Front doors | `pm-agent` (planning) and `team-lead` (execution), including native entry points |
+| Front doors | `pm-agent` (planning), `team-lead` (execution), and separately invoked `pr-agent` (pull-request lifecycle and review), including native entry points |
 | Workers | Selected specialists, mission, ownership, inputs, outputs, and handoff |
 | Environment tailoring | Planned repository paths, approved stack, runtime/deployment environments, and commands |
 | Models | Model assigned to each role, rationale, and fallback (if any) |
@@ -157,7 +157,8 @@ tool configuration required by that map. For every resource:
   quality gates, and handoff protocol from
   `instructions/TEAM-ORCHESTRATION.md` and `instructions/agents/`;
 - keep `pm-agent` as the planning front door and `team-lead` as the execution
-  front door; and
+- front door;
+- keep `pr-agent` separately invoked for pull-request lifecycle and cumulative review; it must not run automatically from `team-lead`; and
 - use permissions appropriate to its mission and project workflow.
 
 Do not modify application code or unrelated project behavior. If the PRD,

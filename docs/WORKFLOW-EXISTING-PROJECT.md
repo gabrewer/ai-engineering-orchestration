@@ -72,7 +72,7 @@ Choose the tool or tools for this project, such as Claude Code, GitHub Copilot, 
 - verify the adapter exists, creating one if necessary;
 - install or generate its native project files and entry points;
 - configure model, delegation, permissions, and tool access; and
-- verify that `pm-agent` owns planning and `team-lead` owns execution.
+- verify that `pm-agent` owns planning, `team-lead` owns execution, and a configured `pr-agent` is separately invoked for pull-request lifecycle and review.
 
 Adapters define native setup and delegation. Shared worker contracts and orchestration gates remain defined by the canonical instructions.
 
@@ -142,7 +142,7 @@ Before generating native files, present a compact team map containing:
 
 | Area | Required detail |
 |---|---|
-| Front doors | `pm-agent` (planning) and `team-lead` (execution), including native entry points |
+| Front doors | `pm-agent` (planning), `team-lead` (execution), and separately invoked `pr-agent` (pull-request lifecycle and review), including native entry points |
 | Workers | Each selected specialist, its mission, ownership boundary, inputs, outputs, and handoff |
 | Environment tailoring | Real repository paths, package/runtime versions, environments, and verification commands |
 | Models | Model assigned to each front door and worker, with the reason and fallback (if any) |
@@ -168,7 +168,8 @@ prompts, skills, agent files, and tool configuration required by that map. For e
   requirements, quality gates, and handoff protocol from
   `instructions/TEAM-ORCHESTRATION.md` and `instructions/agents/`;
 - keep `pm-agent` as the planning front door and `team-lead` as the execution
-  front door; and
+- front door;
+- keep `pr-agent` separately invoked for pull-request lifecycle and cumulative review; it must not run automatically from `team-lead`; and
 - use permissions appropriate to the role and project workflow.
 
 Do not modify application code or unrelated project behavior. If required context is missing or conflicts with an existing

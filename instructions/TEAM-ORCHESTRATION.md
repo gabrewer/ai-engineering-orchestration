@@ -45,12 +45,13 @@ Once execution is delegated through the `team-lead` front door, that session act
 
 ## Workflow Entry Points
 
-Every tool adapter must present two cohesive front doors:
+Every tool adapter must present two cohesive delivery front doors and may present the canonical standalone PR front door:
 
 - `pm-agent` coordinates product design, PM work, questions, approval, and planning artifacts;
-- `team-lead` coordinates approved-plan execution, workers, quality gates, commits, reporting, and acceptance preparation.
+- `team-lead` coordinates approved-plan execution, workers, quality gates, commits, reporting, and acceptance preparation;
+- `pr-agent`, when installed, is invoked separately to prepare/open/refresh pull requests, perform cumulative base-to-head review, and report human merge readiness.
 
-Use each tool's native representation: Pi prompt templates, Claude Code and GitHub Copilot agent files, and opencode `primary` agents. Internal phases belong in worker skills or subagents rather than requiring the user to understand the worker graph. Additional entry points are useful only when they provide a genuinely separate workflow or focused utility; their ownership must not overlap or leave gaps between planning and execution.
+Use each tool's native representation: Pi prompt templates, Claude Code and GitHub Copilot agent files, and opencode `primary` agents. Internal phases belong in worker skills or subagents rather than requiring the user to understand the worker graph. PR Agent must never run automatically as part of Team Lead, and Team Lead completion must not imply permission to push, create, edit, or merge a pull request. Additional entry points are useful only when they provide a genuinely separate workflow or focused utility; their ownership must not overlap or leave gaps between planning, execution, and cumulative review.
 
 When a tool supports native agents, the primary/default session must route planning requests to `pm-agent` and execution requests to `team-lead`. It must not imitate, collapse, or bypass these front-door agents. Each adapter must put this routing rule in the tool's always-loaded project instructions as well as defining the agents themselves.
 
@@ -98,6 +99,18 @@ Every generated worker reads the shared contract in [`agents/README.md`](agents/
 | `git-committer` | [`agents/git-committer.md`](agents/git-committer.md) | Review returns `SHIP IT` and task-owned work is ready to commit |
 
 The active adapter may add project-specific framework knowledge or narrower tool access, but must not merge roles merely for convenience. A worker can report that another role is needed; it cannot adopt that role and continue unless team-lead explicitly performs a new handoff.
+
+### `pr-agent`
+
+Runs the separately invoked pull-request lifecycle and cumulative review gate after or alongside coherent committed work.
+
+- Defaults to read-only `prepare`; supports explicit `open`, `refresh`, and `review` modes.
+- Reviews the complete merge-base/base-to-head diff and linked acceptance evidence; task-level PASS results are supporting evidence, not cumulative approval.
+- Requires explicit human authorization before push, PR creation/editing, or posting durable provider updates.
+- Produces `READY FOR HUMAN REVIEW`, `CHANGES REQUIRED`, `HUMAN DECISION REQUIRED`, or—only after required checks and blocker resolution—`READY FOR HUMAN MERGE`.
+- Never implements fixes, rewrites published history, dismisses review feedback, closes issues/PRs, applies final disposition labels, or merges.
+- Uses the configured state backend for durable remediation/readiness evidence; the PR remains a review surface rather than the execution ledger.
+- **Tools**: Read, Glob, Grep, Bash; provider mutations only after mode-specific authorization
 
 If the active AI tool produces local session or worker logs, treat them as untracked diagnostic traces. The selected state backend remains the durable source of truth for sprint/task state.
 
