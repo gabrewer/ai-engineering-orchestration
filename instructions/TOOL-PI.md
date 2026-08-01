@@ -49,7 +49,7 @@ In filesystem state-backend mode, durable orchestration state lives in the paths
 
 ## Agent Definition Format
 
-Pi does not ship a native subagent file format. Define each worker role as a **Pi skill** in `.pi/skills/<agent-name>/SKILL.md` or `.agents/skills/<agent-name>/SKILL.md`. The `/team-lead` prompt loads the appropriate skill when each phase begins and applies it within the active session.
+Pi does not ship a native subagent file format. Define each worker role as a **Pi skill** in `.pi/skills/<agent-name>/SKILL.md` or `.agents/skills/<agent-name>/SKILL.md`. Generate each skill from `instructions/agents/README.md` and the matching canonical role contract; project context specializes the contract but does not replace it. The `/team-lead` prompt loads the appropriate skill when each phase begins and applies it within the active session.
 
 Recommended project-local skill format:
 
@@ -107,6 +107,7 @@ AGENTS.md                         # Repo-wide Pi instructions; create only if ab
     frontend-builder/SKILL.md
     destroyer/SKILL.md
     review-agent/SKILL.md
+    tester/SKILL.md
     git-committer/SKILL.md
 .pi/tmp/                          # temporary drafts only; ignored
 ```
@@ -134,7 +135,9 @@ If no repo-level context file exists, create a short `AGENTS.md` with:
 
 Replace the placeholder with the user's choice. If `AGENTS.md` or the harness-equivalent repo context file already exists, append the single selected marker and only the Pi orchestration deltas; keep the existing project rules authoritative. If agents were installed previously without a marker, ask once on the next setup/planning run and persist it immediately.
 
-### 4. Create worker skills from the project context
+### 4. Create worker skills from canonical contracts and project context
+
+Read `instructions/agents/README.md` and each matching `instructions/agents/<agent-name>.md` before generating workers. Preserve every canonical responsibility, non-responsibility, scope boundary, procedure, outcome, evidence requirement, and handoff. Add repository-specific paths, frameworks, commands, policies, and tool restrictions without copying generic behavior into a conflicting local contract.
 
 Each worker skill should be a directory with `SKILL.md` and frontmatter:
 
@@ -146,7 +149,7 @@ description: Builds backend code for one assigned task in this repository. Use w
 
 # Backend Builder
 
-Use the automatically loaded repository instructions, then read `instructions/TEAM-ORCHESTRATION.md`, the sprint issue/file, and the files named in the task before editing. Follow the repository's existing backend architecture and verification commands. Never modify tests unless this task explicitly assigns test work.
+Use the automatically loaded repository instructions, then follow `instructions/agents/README.md`, `instructions/agents/backend-builder.md`, the approved task, and the files named in it. Follow the repository's existing backend architecture and verification commands. Never modify tests; report a test-contract mismatch to the coordinator.
 ```
 
 Keep the first version conservative. Prefer narrow, repository-specific instructions over broad generic agent personas. Every generated worker skill and plain agent prompt must include a short rule to reuse the state backend from automatically loaded repository instructions without prompting, and to report incomplete initialization to the coordinator if it is absent. Do not copy the selected value into each agent, require a separate `AGENTS.md` read, or limit this knowledge to `/pm-agent` and `/team-lead`.
@@ -159,6 +162,8 @@ Install both:
 - `.pi/prompts/team-lead.md` — executes an approved sprint through worker skills and quality gates.
 
 Both prompts must use the automatically loaded repo-level instructions containing the persisted state backend, name any additional files to read first, and include temp-file paths, quality-gate headings, verification commands, and the rule that acceptance verification is prepared for a human rather than self-approved. They must resolve the backend from repository context rather than accepting it as a routine prompt argument or spending a separate tool call to reload `AGENTS.md`.
+
+The generated `/pm-agent` prompt must record scope, exclusions, acceptance criteria, dependencies, applicability classifications, required specialist phases, and verification expectations in the approved sprint manifest. The generated `/team-lead` prompt must treat that manifest as the planning handoff contract: perform an execution-readiness preflight, then execute the recorded decisions without repeating PM analysis or adding speculative work. It may return an affected task to planning only under the canonical conditions in `TEAM-ORCHESTRATION.md`.
 
 Before creating prompts and skills, present a concise resource map showing each prompt, the worker skills it coordinates, and the proposed provider/model/thinking assignment. This is a design review, not a requirement to forbid additional prompts.
 
@@ -217,6 +222,7 @@ Use the Lessi.App sequence-parity workflow as the target quality bar for generat
 
 - **Read-before-write list**: name exact standards, spec files, source areas, tests, and existing issue comments to read before planning or execution.
 - **Single source of truth**: read the repository's persisted backend marker and state whether GitHub Issues or filesystem is authoritative; do not make it a per-run choice. In GitHub mode, prefer one umbrella/control sprint issue with comments/checklists when the human wants to avoid issue sprawl.
+- **Planning/execution handoff**: `/pm-agent` records scope and applicability decisions; `/team-lead` consumes them, checks execution readiness, and does not reproduce planning analysis unless a canonical planning-return condition is discovered.
 - **Full-stack default**: require a Contract Impact Check before tasking. Frontend-only is allowed only when explicitly marked `UI polish only`, `docs only`, or `frontend prototype only`.
 - **No state tunneling**: forbid production behavior that hides structured domain state in free-text fields such as `notes`, `description`, `metadataJson`, or local/session storage when a typed API contract is required.
 - **Write-side validation**: if typed IDs link persisted resources, require create/update paths to reject malformed, nonexistent, deleted, cross-user/tenant, and invalid child-item references before persistence.
@@ -268,6 +274,7 @@ When a prompt, skill, or extension can restrict tools by role, use an allowlist 
 | test-writer | `read,write,edit,bash,grep,find,ls` |
 | destroyer | `read,write,bash,grep,find,ls` if writing adversarial tests; otherwise omit `write` |
 | review-agent | `read,bash,grep,find,ls` |
+| tester | `read,bash,grep,find,ls` plus browser/runtime tools only when required |
 | git-committer | `read,bash,grep,find,ls` |
 
 Use `--tools` to restrict tools:
@@ -320,6 +327,7 @@ Extensions are TypeScript modules and can register tools via `pi.registerTool()`
 
 ## Notes
 
+- `TEAM-ORCHESTRATION.md` is the canonical workflow, and `instructions/agents/*.md` are the canonical worker behavior contracts.
 - Pi project context is normally provided by `AGENTS.md` files in the repository tree.
 - Pi skills are progressively loaded: startup includes skill names/descriptions, and the agent reads full `SKILL.md` when the task matches or the user invokes `/skill:<name>`.
 - Prompt templates are non-recursive under `.pi/prompts/`; put one template per file at that level unless configured otherwise.
