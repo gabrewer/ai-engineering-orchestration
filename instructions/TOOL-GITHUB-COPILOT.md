@@ -20,6 +20,7 @@ This file describes how to configure the team-orchestration workflow for **GitHu
     frontend-builder.agent.md
     destroyer.agent.md
     review-agent.agent.md
+    tester.agent.md
     git-committer.agent.md
   instructions/             # Shared instruction files (.instructions.md)
   copilot-instructions.md   # Always-loaded rules and front-door routing
@@ -55,6 +56,10 @@ Your agent system prompt here.
 
 Any model available in your GitHub Copilot subscription can be specified by its model ID.
 
+### Canonical worker source
+
+Generate every worker agent from `instructions/agents/README.md` and its matching `instructions/agents/<agent-name>.md` contract. Preserve the canonical ownership, non-responsibilities, scope/write boundaries, procedure, evidence, verdicts, and handoff while adding Copilot-specific frontmatter and repository specialization. Do not independently rewrite role behavior in this adapter.
+
 ### Required front-door agents
 
 Install both `.github/agents/pm-agent.agent.md` and `.github/agents/team-lead.agent.md`:
@@ -63,6 +68,8 @@ Install both `.github/agents/pm-agent.agent.md` and `.github/agents/team-lead.ag
 - `team-lead` accepts only an approved plan and owns worker delegation, quality gates, commits, reporting, and acceptance preparation.
 
 Both agents must read `.github/copilot-instructions.md` and `TEAM-ORCHESTRATION.md` first, state their entry conditions, and use the canonical progress/report headings.
+
+The generated `pm-agent` must record scope, exclusions, acceptance criteria, dependencies, applicability classifications, required specialist phases, and verification expectations in the approved sprint manifest. The generated `team-lead` must consume that manifest as the planning handoff contract, perform only an execution-readiness preflight, and avoid repeating PM analysis or adding speculative work. It returns an affected task to planning only under the canonical conditions in `TEAM-ORCHESTRATION.md`.
 
 Add the following to `.github/copilot-instructions.md`:
 
@@ -117,5 +124,5 @@ The delegated `team-lead` then invokes worker agents with the task identifier, s
 - Agent Skills live under `.agents/skills/<skill-name>/SKILL.md`; each skill should be a directory containing `SKILL.md` and any supporting references/scripts/assets.
 - The `task-issues.json` file is created during brainstorming and lives at the project root.
 - Copilot's coding agent can be assigned tasks directly through GitHub Issues by assigning the issue to `@copilot`.
-- Follow `TEAM-ORCHESTRATION.md` as the canonical, harness-agnostic workflow; this file is only the GitHub Copilot adapter for paths, formats, and native delegation.
+- Follow `TEAM-ORCHESTRATION.md` as the canonical, harness-agnostic workflow and `instructions/agents/*.md` as the canonical worker contracts; this file is only the GitHub Copilot adapter for paths, formats, and native delegation.
 - Do not restate or override canonical state-backend, quality-gate, commit-gate, readiness, or issue-disposition rules here.

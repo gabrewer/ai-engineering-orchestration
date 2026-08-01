@@ -1,6 +1,6 @@
 # Team Orchestration
 
-This project uses a team of specialized AI roles as a structured planning and build workflow. The active AI session is the coordinator: it loads or delegates to the appropriate worker instructions, enforces quality gates, and records progress in the selected state backend.
+This file defines how a generated project-specific team plans and executes work. Agent discovery and generation are defined separately in [`AGENT-GENERATION.md`](AGENT-GENERATION.md). The active AI session coordinates the generated workers, enforces quality gates, and records progress in the selected state backend.
 
 > **Trigger phrase**: Say "execute the plan" (or similar) to start the tool's team-lead workflow.
 
@@ -8,9 +8,40 @@ This project uses a team of specialized AI roles as a structured planning and bu
 
 ---
 
+## Project-Specific Agent Generation
+
+This document is both an operating model and a generation contract. It is used to create the agents for the current project, not to define one universal team that is blindly reused across repositories.
+
+### Source inputs
+
+Use whichever inputs exist, in this order of authority for the relevant concern:
+
+1. Explicit human requirements and decisions
+2. The approved PRD, sprint brief, or other planning documentation
+3. Repository instructions and documented project conventions
+4. The current repository's source code, tests, configuration, and deployment files
+5. This file and the canonical worker contracts for workflow behavior
+
+When a PRD or other documentation describes a target environment, treat it as an intended environment and verify it against the repository. When documentation is absent or incomplete, infer implementation context from the repository and clearly record assumptions.
+
+### Tailoring requirements
+
+Before generating orchestration resources, identify and encode at least:
+
+- languages, frameworks, package managers, build/test/lint commands, and repository layout;
+- runtime, hosting, deployment, operating-system, browser, cloud, database, and integration environments;
+- project-specific domain terminology, architecture boundaries, security/privacy risks, and coding conventions;
+- applicable specialist roles, worker routing, model assignments, tool permissions, quality gates, and verification commands.
+
+Generated agents must name the project-specific files and commands they should use, must not assume technologies or environments that are not present or approved, and must retain the role's scope boundary and handoff. If an environment is materially ambiguous, pause generation and ask the human.
+
+### Generation output
+
+The setup process should first show a compact map of the proposed front-door agents, specialized workers, environment tailoring, model assignments, and permissions. It then generates the active tool's native definitions and the repository-level instructions needed to route planning through `pm-agent` and execution through `team-lead`. The generated resources are project configuration; this file remains the shared source of truth for the workflow.
+
 ## Philosophy
 
-The main AI session acts as the **Team Lead**. It owns the execution plan, coordinates worker roles, manages the dependency graph, and makes the escalation call: small issues get auto-fixed, big ones get flagged for the human. The system starts conservative and earns more autonomy over time as breadcrumbs prove good judgment.
+Once execution is delegated through the `team-lead` front door, that session acts as the coordinator. It owns the execution plan, coordinates worker roles, manages the dependency graph, and makes the escalation call: small issues get auto-fixed, big ones get flagged for the human. The system starts conservative and earns more autonomy over time as breadcrumbs prove good judgment.
 
 ## Workflow Entry Points
 
@@ -23,144 +54,50 @@ Use each tool's native representation: Pi prompt templates, Claude Code and GitH
 
 When a tool supports native agents, the primary/default session must route planning requests to `pm-agent` and execution requests to `team-lead`. It must not imitate, collapse, or bypass these front-door agents. Each adapter must put this routing rule in the tool's always-loaded project instructions as well as defining the agents themselves.
 
-When generating orchestration resources, first show a compact map of proposed front-door agents, worker skills/subagents, and model assignments. A quick sanity check is: can a user plan and execute work through the front doors without knowing which internal worker runs each phase?
+A quick orchestration sanity check is: can a user plan and execute work through the front doors without knowing which internal worker runs each phase?
+
+### Planning Authority and Execution Authority
+
+The approved sprint manifest is the handoff contract between `pm-agent` and `team-lead`.
+
+`pm-agent` owns product intent, scope, exclusions, task decomposition, dependencies, acceptance criteria, and planning classifications about which standards, specialist phases, quality evidence, and runtime checks apply. It records those decisions and their rationale in the authoritative sprint issue or file before approval. Planning classifications may specialize project-specific applicability, but they cannot waive gates that this workflow or the repository explicitly marks mandatory.
+
+`team-lead` consumes those approved decisions. Its preflight confirms that the manifest is approved, complete enough to execute, internally coherent, and compatible with the current repository state. It must not repeat the PM analysis, silently broaden scope, or add speculative tasks, specialists, checks, or evidence requirements merely because they exist in a generic workflow template.
+
+During execution, `team-lead` owns dependency ordering, worker routing, tactical implementation decisions within task scope, deterministic gates, remediation, commits, status reporting, and acceptance preparation. It may select a narrower risk-based verification command when the manifest permits it, but it may not weaken explicit acceptance criteria or required gates.
+
+Reopen planning only when execution reveals one of these conditions:
+
+- implementation would materially change approved behavior, scope, contracts, persistence, ownership, or operational boundaries;
+- the manifest is missing or contradicts information required to make a safe implementation decision;
+- the current repository state invalidates a material planning assumption;
+- a repository rule or mandatory safety requirement conflicts with the approved plan.
+
+When this happens, pause only the affected work, record the evidence, and return the decision to `pm-agent` or the human. Ordinary implementation details, worker handoffs, expected remediation, and file-level discoveries within approved scope are execution concerns, not reasons to re-plan.
 
 ---
 
 ## The Team
 
-Every front-door agent and worker role is defined using the active AI tool's native prompts, skills, instructions, or agent files. The exact format depends on the tool — see the relevant `TOOL-*.md` for details. The example below shows the Claude Code format:
+Worker behavior is defined once in [`agents/`](agents/README.md) and translated into the active tool's native prompt, skill, instruction, or agent format. Tool adapters define only native paths, delegation mechanics, model selection, and tool permissions; they must not fork the behavioral contract.
 
-```markdown
----
-model: sonnet
-tools: Read,Write,Edit,Glob,Grep,Bash
----
+Every generated worker reads the shared contract in [`agents/README.md`](agents/README.md), its role file, the approved task, and repository instructions. Preserve the role's mission, ownership, non-responsibilities, procedure, scope boundary, evidence, blocking conditions, and handoff when specializing it for a project.
 
-Your system prompt here...
-```
+| Worker | Canonical contract | Runs when |
+|---|---|---|
+| `product-designer` | [`agents/product-designer.md`](agents/product-designer.md) | Product behavior or interaction intent needs an implementation-ready brief |
+| `pm` | [`agents/pm.md`](agents/pm.md) | Approved intent needs an executable manifest or completion summary |
+| `domain-modeler` | [`agents/domain-modeler.md`](agents/domain-modeler.md) | The approved manifest changes domain language, invariants, or state transitions |
+| `api-developer` | [`agents/api-developer.md`](agents/api-developer.md) | The approved manifest changes a service/API contract |
+| `test-writer` | [`agents/test-writer.md`](agents/test-writer.md) | A task needs pre-implementation or regression evidence |
+| `backend-builder` | [`agents/backend-builder.md`](agents/backend-builder.md) | A task implements server-side behavior |
+| `frontend-builder` | [`agents/frontend-builder.md`](agents/frontend-builder.md) | A task implements client behavior |
+| `destroyer` | [`agents/destroyer.md`](agents/destroyer.md) | Changed work reaches the adversarial gate |
+| `review-agent` | [`agents/review-agent.md`](agents/review-agent.md) | Changed work and destroyer evidence need an independent verdict |
+| `tester` | [`agents/tester.md`](agents/tester.md) | Reviewed work reaches final risk-based verification |
+| `git-committer` | [`agents/git-committer.md`](agents/git-committer.md) | Review returns `SHIP IT` and task-owned work is ready to commit |
 
-### `product-designer`
-
-Expands milestones into detailed sprint briefs.
-
-- Reads the master PRD and expands every milestone into concrete requirements
-- Defines user stories, screen descriptions, interaction details, and edge cases
-- Makes UX decisions — doesn't leave ambiguity for the PM
-- Writes durable sprint briefs to `docs/sprints/<sprint-name>-brief.md` when the brief is a product/design deliverable; otherwise records planning output in the selected state backend
-- If ambiguity can't be resolved, posts questions to the selected state backend using the 🧭 planning status
-- **Tools**: Read, Write, Edit, Glob, Grep, Bash
-- **Model**: Opus
-
-### `pm`
-
-Turns sprint briefs into actionable sprint plans.
-
-- Reads sprint briefs (from Product Designer) and produces structured sprint plans
-- Each Task is either **prescriptive** (specific implementation instructions) or **goal-oriented** (desired outcome, agent decides approach)
-- Writes machine-readable sprint plans only when the selected workflow needs them; execution state lives in the selected backend
-- Creates or updates the selected state backend with the human-readable task board, Contract Impact Check, dependencies, and Quality Gates
-- If briefs have unresolved ambiguity, records the specific questions in the selected state backend and marks the sprint blocked/needs-input
-- Posts sprint summaries to the selected state backend after build loop execution completes
-- **Tools**: Read, Write, Glob, Grep, Bash
-
-### `domain-modeler`
-
-Defines the domain before anyone writes code.
-
-- Produces the domain model: entities, aggregates, value objects, events, commands
-- For event-sourced systems (like this one using Marten), defines the event catalog — the foundational contract everything else builds on
-- Runs early in each Sprint before builders touch anything
-- Collaborates with the PM Agent to ensure Tasks align with the domain model
-- Leaves breadcrumbs for every modeling decision
-- **Tools**: Read, Write, Edit, Glob, Grep, Bash
-
-### `api-developer`
-
-Defines and builds the contract between frontend and backend.
-
-- Produces API specifications (endpoints, request/response shapes, error contracts)
-- Both frontend and backend builders work against this contract — it prevents drift
-- Runs after the Domain Modeler and before the builders
-- Updates the contract when domain changes require it
-- Leaves breadcrumbs for every contract decision
-- **Tools**: Read, Write, Edit, Glob, Grep, Bash
-
-### `test-writer`
-
-Writes tests for a given task — before any implementation exists.
-
-- Tests for genuinely new behavior should fail before implementation. Regression tests for existing guarantees may already pass; record those as baseline/resilient evidence. If a supposed new-behavior test passes, inspect whether the behavior already exists or the test is too weak before continuing.
-- Works against the API contract and domain model
-- **Backend tasks**: follow the repository's documented test frameworks and conventions; do not impose a unit-test-only policy. Use unit tests for isolated pure logic when valuable, and automated integration tests whenever correctness depends on HTTP contracts, authentication, authorization, ownership/tenancy, persistence, transactions, concurrency, messaging, service discovery, gateway/routing policy, or other runtime boundaries. Prefer real project-owned dependencies; mock or emulate external providers only as the repository permits.
-- Security-sensitive boundary tests must exercise rejection paths such as unauthenticated, unauthorized, cross-user/tenant, forged or nonexistent linkage, failed authority/provider dependencies, no-mutation-on-rejection, and genuine concurrent attempts where applicable.
-- Integration evidence belongs in the automated task/sprint verification path rather than being deferred to an unspecified manual run. If required infrastructure cannot run, report the check as `NOT CHECKED` with the reason and treat it as blocking unless the human explicitly accepts the gap.
-- **Frontend tasks**: Vitest for component logic and hooks — no browser, no real API calls
-- Playwright is **not** the test-writer's responsibility — see `frontend-builder` below
-- **Tools**: Read, Write, Glob, Grep, Bash (for running tests only)
-
-### `backend-builder`
-
-Owns the server-side application.
-
-- Builds API endpoints, domain logic, data access, authentication, infrastructure
-- Works against the API contract and domain model
-- **Never alters a test** — if a test seems wrong, it flags it and stops
-- Done when all task tests pass
-- Leaves breadcrumbs for every architectural decision
-- **Scope boundary**: when given review feedback, reads only the files explicitly named in the feedback and makes exactly the changes described. Does not explore the broader codebase or refactor adjacent code.
-- **If review feedback names a file this task did not create or modify**: outputs `BLOCKED: <filename> is pre-existing code outside this task's scope` and stops. Does not make the change, does not update comments as a substitute.
-- **Tools**: Read, Write, Edit, Glob, Grep, Bash
-
-### `frontend-builder`
-
-Owns the client-side application.
-
-- Builds components, routes, pages, client-side state, and API client code
-- Works against the API contract — never invents endpoints
-- **Never alters a test** — if a test seems wrong, it flags it and stops
-- Done when all task Vitest tests pass **and** Playwright E2E tests are written
-- After implementation is complete, writes Playwright E2E tests in `frontend/e2e/<task-id>/`. These target the real running stack (no mocking) and are the developer's manual regression suite (`bun run test:e2e`). They are not run by the pipeline.
-- Leaves breadcrumbs for every significant UI decision
-- **Scope boundary**: same rules as backend-builder — only touches files this task created or modified. Outputs `BLOCKED` if asked to fix pre-existing code in other files.
-- **Tools**: Read, Write, Edit, Glob, Grep, Bash
-
-### `destroyer`
-
-Stress-tests completed work. The adversarial half of the immune system.
-
-- Reviews code for correctness, security, edge cases, and adherence to the domain model and API contract
-- Writes adversarial tests — but **only for code this task created or modified**. Never writes tests for pre-existing code or out-of-scope behavior — those tests fail permanently and poison subsequent tasks.
-- Only reports **critical** and **high** severity findings as actionable. Medium and low go in a non-blocking notes section that the review-agent cannot route to builders.
-- Does NOT fix issues — reports them to the Review Agent via `## 🔥 Destroy Report: ...` in the selected state backend
-- Leaves breadcrumbs documenting what was tested, what survived, and what broke
-- **Scope boundary**: starts with files explicitly listed in the task description. Only expands to related files if a finding requires broader context. Does not grep or glob across the entire codebase. Does not re-report issues that are clearly pre-existing in other tasks' code.
-- **Most tasks should produce CLEAN or one high finding.** Quantity of findings does not equal quality — flag at most one issue per category.
-- **Tools**: Read, Write, Glob, Grep, Bash (read-only commands except for writing tests)
-
-### `review-agent`
-
-Triages destroyer findings and drives resolution.
-
-- Assesses each issue the Destroyer raises
-- Routes issues to the appropriate builder for fixes
-- Verifies fixes after builders address them
-- Applies the escalation threshold: small issues (style, naming, minor refactors) get auto-resolved; big issues (architectural concerns, security, fundamental approach problems) get escalated to the human
-- Posts `## 👀 Review Report: ...` reports to the selected state backend and leaves breadcrumbs documenting the triage decision and resolution for every issue
-- **Pre-existing bugs are not this task's responsibility.** If a finding is in code not written or modified by this task, the review-agent marks it `DEFERRED` and does not route it to the builder. It ships unless the pre-existing bug actively breaks this task's own work (security issue or domain model violation). Deferred findings are noted for a future task to own.
-- **Output**: Emits exactly one of:
-  - `SHIP IT` — all issues resolved or acceptably low risk
-  - `CHANGES NEEDED: <exact problem description>` — builder must fix specific issues (file:line references, surgical — no background context)
-  - `ESCALATE: <problem description>` — requires human review
-- **If CHANGES NEEDED**: the Team Lead delegates the specific remediation to the appropriate builder role. The loop repeats up to 6 times.
-- **Tools**: Read, Glob, Grep, Bash (read-only commands only)
-
-### `git-committer`
-
-Commits all task work after the review agent approves.
-
-- Triggered by the Team Lead after `SHIP IT`
-- **Tools**: Read, Glob, Grep, Bash
+The active adapter may add project-specific framework knowledge or narrower tool access, but must not merge roles merely for convenience. A worker can report that another role is needed; it cannot adopt that role and continue unless team-lead explicitly performs a new handoff.
 
 If the active AI tool produces local session or worker logs, treat them as untracked diagnostic traces. The selected state backend remains the durable source of truth for sprint/task state.
 
@@ -244,6 +181,12 @@ Use this structure for a GitHub epic/sprint issue or a filesystem sprint markdow
 - Persistence/metadata needed? yes/no
 - Backend/API tests needed? yes/no
 - Runtime/browser validation needed? yes/no
+
+## 🧭 Planning Classifications
+- Applicable standards and specialist phases: <items with rationale>
+- Explicitly not applicable: <items with rationale>
+- Required quality/runtime evidence: <items or n/a>
+- Assumptions that would reopen planning: <items or none>
 
 ## 🧩 Task Board
 - [ ] 🧱 **TASK-001: <title>** — `<agent>` — blocked by: none
@@ -425,7 +368,7 @@ PLANNING LOOP (interactive, daytime):
   ↓ human reviews plans ↓
 
 BUILD LOOP (autonomous, overnight):
-  [per sprint]: domain-model → api-contract → [per task]: test → build → build-gate → destroy → review → commit → smoke-test → pm summary
+  [per sprint]: applicable planned specialist phases → [per task]: planned test evidence → build → build-gate → destroy → review → commit → tester/smoke → pm summary
   refine → report
 ```
 
@@ -444,6 +387,7 @@ Each step is either **agentic** (the Team Lead performs it under a worker role o
 - Code generation (`backend-builder` / `frontend-builder` roles)
 - Adversarial testing (`destroyer` role)
 - Issue triage and review (`review-agent` role)
+- Final risk-based verification (`tester` role)
 - Sprint summary (`pm` role)
 - Brainstorming and planning (interactive, with the user)
 - Execution planning (performed by the Team Lead from the approved plan and dependency graph)
@@ -455,14 +399,15 @@ Each step is either **agentic** (the Team Lead performs it under a worker role o
 
 Enter through the active AI tool's `team-lead` prompt or agent. The Team Lead:
 
-1. Reads the approved sprint issue/file from the selected state backend.
-2. Builds a dependency graph and proposes the execution order for human approval when required.
+1. Reads the approved sprint issue/file from the selected state backend and consumes its scope, exclusions, acceptance criteria, and planning classifications without reproducing the PM analysis.
+2. Performs an execution-readiness preflight, then builds the dependency graph and proposes the execution order for human approval when required.
 3. Executes sprints in sequence and may delegate independent tasks concurrently only when the tool supports safe isolation.
-4. Runs `domain-modeler` → `api-developer` → the per-task pipeline for each sprint.
-5. Runs `test-writer` → builder → build gate → `destroyer` → `review-agent` (up to 6 attempts) → `git-committer` for each task.
+4. Runs only the specialist phases classified as applicable in the approved manifest, followed by the per-task pipeline.
+5. Runs applicable `test-writer` evidence → assigned builder → build gate → `destroyer` → `review-agent` (up to 6 attempts) → `git-committer` for each task.
 6. Applies the Pull Request Size Checkpoint after each committed task or coherent batch.
-7. Runs sprint verification and has the `pm` role write the completion summary.
+7. Delegates the approved risk-based sprint verification to `tester`, then has the `pm` role write the completion summary.
 8. Records every durable status transition and report in the selected state backend.
+9. Reopens planning only under the Planning Authority and Execution Authority conditions; otherwise resolves implementation details inside the execution loop.
 
 The tool adapter may implement a role as a native subagent, a loaded skill, or a temporary role adopted by the main session. The quality gates and evidence requirements are the same in every case.
 
@@ -516,6 +461,18 @@ Once the user approves the plan:
 
 This phase starts when the user says "execute the plan" or invokes the tool's team-lead entry point. The active AI session reads the approved plan, coordinates the worker roles, runs deterministic gates, and records progress.
 
+### Execution-readiness preflight
+
+Before starting workers, the Team Lead:
+
+1. confirms the plan is approved and identifies the authoritative sprint record;
+2. reads the recorded scope, exclusions, dependencies, acceptance criteria, planning classifications, and verification requirements;
+3. checks only for execution blockers: missing required inputs, internal contradictions, stale material assumptions, repository-rule conflicts, or impossible dependency ordering;
+4. records any evidence-backed planning return without attempting to redesign the sprint itself;
+5. otherwise starts execution without rerunning completed planning analyses.
+
+A preflight is not a second planning phase. Do not generate a parallel impact analysis, reinterpret explicit applicability decisions, or load a specialist solely to reconsider the PM's classification. If implementation later crosses an assumption named in the manifest, use the planning-return conditions above.
+
 ### Real-time status updates
 
 The Team Lead updates task status in the selected backend at each key transition, before starting the corresponding worker phase.
@@ -546,40 +503,39 @@ When the destroyer or review-agent escalates, mark the task/gate `👀` in the s
 
 ### The per-Sprint pipeline
 
-#### Step 1: Domain Modeling
+#### Step 1: Applicable Pre-build Specialist Phases
 
-The `domain-modeler` runs first for each Sprint's scope. It defines or updates:
-- Entities, aggregates, value objects
-- Events and commands (critical for Marten event sourcing)
-- The event catalog is locked before building begins
+Run only the pre-build roles classified as applicable in the approved manifest, in dependency order. For example:
 
-#### Step 2: API Contract
+- `domain-modeler` when the sprint defines or changes domain entities, aggregates, value objects, events, or commands;
+- `api-developer` when the sprint defines or changes an API contract that builders must share.
 
-The `api-developer` defines or updates the API contract for this Sprint's tasks. Both frontend and backend builders code against this contract — it prevents drift.
+Skip roles explicitly classified as not applicable. Do not invoke a specialist to redo the classification. If a builder discovers that an omitted phase is required because the implementation would cross an approved scope or contract boundary, pause the affected task and return that evidence for planning rather than silently expanding the sprint.
+
+#### Step 2: Confirm Shared Build Inputs
+
+Before task implementation, confirm that every applicable domain model, API contract, design artifact, or other planned shared input is available to the assigned builders. This is an execution dependency check, not a new design phase.
 
 #### Step 3: Per-Task Pipeline
 
 For each task in the Sprint:
 
-1. **`test-writer`** — writes the repository-appropriate unit and/or integration tests required by the task's contract and risk; new-behavior tests must fail at write time, while regression tests for existing guarantees may already pass and should be recorded as resilient evidence
-2. **Builders** (`backend-builder` / `frontend-builder`) — write code until all tests pass
+1. **`test-writer` when applicable** — writes the repository-appropriate unit and/or integration tests required by the task's contract and risk; new-behavior tests must fail at write time, while regression tests for existing guarantees may already pass and should be recorded as resilient evidence. When the approved manifest classifies test-writing as not applicable, record its planned non-test verification instead of invoking the role.
+2. **Assigned builders** (`backend-builder` / `frontend-builder`) — write code until all task tests and verification pass
 3. **Build gate** — the repository's documented build command must exit 0 before the destroyer runs. If it fails, the error is fed back to the builder. Code that does not compile never reaches the reviewer.
 4. **`destroyer`** — adversarial testing scoped to this task's code only. Only critical/high findings are actionable. Medium/low are noted but do not block.
 5. **`review-agent`** — triages destroyer findings, routes fixes to builders, escalates big issues
 6. **`git-committer`** — commits after `SHIP IT`, then measures and reports the Pull Request Size Checkpoint
 7. **Branch growth gate** — at the strong checkpoint, do not start another independent feature task without a human decision; finish only the smallest coherent stabilization required for a reviewable branch
-8. **Failed task cleanup** — if a task exceeds max review attempts, all uncommitted working tree changes are discarded (`git checkout -- . && git clean -fd`) so broken code does not leak into subsequent tasks.
+8. **Failed task cleanup** — if a task exceeds max review attempts, preserve unrelated and pre-existing work, then restore only task-owned uncommitted changes using the recorded task baseline. Never use blanket checkout/clean commands on a mixed working tree. If task-owned changes cannot be separated safely, stop and ask the human rather than risk data loss.
 
-#### Step 4: Sprint Smoke Test
+#### Step 4: Final Tester / Sprint Smoke Test
 
-After all tasks complete (before the PM summary), the Team Lead runs a sprint-level smoke test:
+After all tasks complete (before the PM summary), team-lead delegates final risk-based verification to [`tester`](agents/tester.md). The tester derives its scope from the approved manifest, final diff, acceptance criteria, changed boundaries, and unresolved review risks.
 
-1. Run the repository's documented full build command — the complete build must pass.
-2. Run the repository's documented full test command — the complete automated test suite must pass.
+At minimum, run the repository's documented required build and test commands. Use focused evidence for isolated changes and expand to integration, runtime, browser, or broader suites when the approved plan, repository policy, or blast radius requires it. Reuse earlier evidence only when it still applies to the final reviewed code.
 
-If the build fails, the sprint is flagged and the PM summary still runs (so there's a written record), but the failure is surfaced clearly. **A sprint is not considered done unless the smoke test passes.**
-
-The script exits `0` on success or non-zero on failure. Failure stops the pipeline and updates the selected state backend to ✋/❌ (blocked), requiring human review.
+The tester posts `## 🧪 Test Report: <sprint-or-task-id> Round <N>` with `PASS`, `FAIL`, or `RISK ACCEPTANCE REQUIRED`. A required failure or unchecked blocking boundary stops the pipeline and updates the selected state backend to ✋/❌. **A sprint is not ready for acceptance verification unless tester returns `PASS` or the human explicitly accepts a reported risk under repository policy.**
 
 ---
 
@@ -646,9 +602,9 @@ The system starts conservative and evolves:
 
 **Autonomous (high trust):**
 - Overlapping phases — next Sprint's planning can begin while current Sprint is in review
-- Builders can propose API contract changes directly (API Developer reviews)
-- Destroyer findings below a severity threshold get auto-resolved without Team Lead involvement
-- Coordinator can adjust Sprint scope based on what it learns during execution
+- Builders can propose API contract changes through the API Developer, but material contract changes still return to planning
+- Destroyer findings below a severity threshold get auto-routed for remediation without human involvement
+- Coordinator can adjust execution order and worker routing within approved scope; scope changes still follow the planning-return contract
 
 Trust level is configured by the human and informed by breadcrumb review. Reading the breadcrumbs and seeing good decisions is how trust is built.
 
@@ -668,5 +624,6 @@ Trust level is configured by the human and informed by breadcrumb review. Readin
 | Temporary issue bodies/comments | Tool-specific temp directory, untracked | Team Lead + agents |
 | Domain model | `docs/domain/<sprint>.md` when durable architecture output is required | Domain Modeler (build loop) |
 | API contract | `docs/api/<sprint>.md` when durable contract docs are required | API Developer (build loop) |
-| Front-door and worker definitions | Tool-specific prompts, skills, instructions, or agent files | Setup (one-time) — see `TOOL-*.md` for format |
+| Canonical worker contracts | `instructions/agents/*.md` | Orchestration maintainers |
+| Front-door and worker definitions | Tool-specific prompts, skills, instructions, or agent files generated from canonical contracts | Setup (one-time) — see `TOOL-*.md` for format |
 | Diagnostic logs/session state | Tool-specific runtime location, untracked | Active AI tool |

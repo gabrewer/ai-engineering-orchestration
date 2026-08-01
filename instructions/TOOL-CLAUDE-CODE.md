@@ -21,6 +21,7 @@ CLAUDE.md                         # Always-loaded project rules and front-door r
     frontend-builder.md
     destroyer.md
     review-agent.md
+    tester.md
     git-committer.md
   skills/                         # Reusable skill definitions (e.g., brainstorming.md)
   verify/                         # Verification scripts (one subdirectory per feature)
@@ -54,6 +55,10 @@ Your agent system prompt here.
 
 `Read`, `Write`, `Edit`, `Glob`, `Grep`, `Bash`, `WebFetch`, `TodoRead`, `TodoWrite`
 
+### Canonical worker source
+
+Generate every worker file from `instructions/agents/README.md` and its matching `instructions/agents/<agent-name>.md` contract. Preserve the canonical ownership, non-responsibilities, scope/write boundaries, procedure, evidence, verdicts, and handoff while adding Claude-specific frontmatter and repository specialization. Do not independently rewrite role behavior in this adapter.
+
 ---
 
 ## Required Front-Door Agents
@@ -64,6 +69,8 @@ Install both agents:
 - `.claude/agents/team-lead.md` accepts only an approved plan and owns worker delegation, deterministic gates, commits, reporting, and acceptance preparation.
 
 Both files must name `TEAM-ORCHESTRATION.md` and `CLAUDE.md` in their read-first instructions, define their entry conditions, and emit the canonical progress/report headings. Give `pm-agent` only the tools needed to inspect the repository and write planning artifacts. Give `team-lead` the tools needed to delegate workers and enforce the complete execution loop.
+
+The generated `pm-agent` must record scope, exclusions, acceptance criteria, dependencies, applicability classifications, required specialist phases, and verification expectations in the approved sprint manifest. The generated `team-lead` must consume that manifest as the planning handoff contract, perform only an execution-readiness preflight, and avoid repeating PM analysis or adding speculative work. It returns an affected task to planning only under the canonical conditions in `TEAM-ORCHESTRATION.md`.
 
 Add this routing rule to the repository's always-loaded `CLAUDE.md`:
 
@@ -108,5 +115,5 @@ Once delegated, `team-lead` coordinates the worker agents in `.claude/agents/`: 
 - `pm-agent.md` and `team-lead.md` are required; worker agents do not replace them.
 - Keep the routing block in `CLAUDE.md` short, explicit, and mandatory so it remains visible in every primary session.
 - The `task-issues.json` file is created during brainstorming and lives at the project root.
-- Follow `TEAM-ORCHESTRATION.md` as the canonical, harness-agnostic workflow; this file is only the Claude Code adapter for paths, formats, and native delegation.
+- Follow `TEAM-ORCHESTRATION.md` as the canonical, harness-agnostic workflow and `instructions/agents/*.md` as the canonical worker contracts; this file is only the Claude Code adapter for paths, formats, and native delegation.
 - Do not restate or override canonical state-backend, quality-gate, commit-gate, readiness, or issue-disposition rules here.

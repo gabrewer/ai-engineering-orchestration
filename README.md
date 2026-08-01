@@ -104,6 +104,15 @@ If you’re expecting a polished framework or final answers, this probably isn�
 
 ## How to Use This Repo
 
+For project setup, start with:
+
+- [`docs/WORKFLOW-NEW-PROJECT.md`](docs/WORKFLOW-NEW-PROJECT.md) — add the orchestration system to a new project
+- [`docs/WORKFLOW-EXISTING-PROJECT.md`](docs/WORKFLOW-EXISTING-PROJECT.md) — add it safely to an existing project
+- [`instructions/AGENT-GENERATION.md`](instructions/AGENT-GENERATION.md) — generate project-tailored agents
+- [`instructions/TEAM-ORCHESTRATION.md`](instructions/TEAM-ORCHESTRATION.md) — run planning and execution
+
+Then:
+
 - Browse the agents and workflows
 - Try things out
 - Adapt ideas to your own context

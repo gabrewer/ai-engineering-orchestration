@@ -93,7 +93,9 @@ Define both `pm-agent` and `team-lead` as named `primary` agents:
 - `pm-agent` owns planning, source audits, questions, state-backend setup, sprint artifacts, and the human approval handoff. It must not implement the plan.
 - `team-lead` accepts only an approved plan and owns worker delegation, deterministic gates, commits, reporting, and acceptance preparation.
 
-Their instructions must read `AGENTS.md` and `TEAM-ORCHESTRATION.md` first, state their entry conditions, and use the canonical progress/report headings. Add always-loaded routing guidance to `AGENTS.md`:
+Their instructions must read `AGENTS.md` and `TEAM-ORCHESTRATION.md` first, state their entry conditions, and use the canonical progress/report headings. The generated `pm-agent` must record scope, exclusions, acceptance criteria, dependencies, applicability classifications, required specialist phases, and verification expectations in the approved sprint manifest. The generated `team-lead` must consume that manifest as the planning handoff contract, perform only an execution-readiness preflight, and avoid repeating PM analysis or adding speculative work. It returns an affected task to planning only under the canonical conditions in `TEAM-ORCHESTRATION.md`.
+
+Add always-loaded routing guidance to `AGENTS.md`:
 
 ```markdown
 ## Orchestration Routing
@@ -116,9 +118,11 @@ opencode supports any provider/model combination using the `provider/model-id` f
 
 ---
 
-## Skills
+## Skills and Canonical Worker Source
 
-opencode does not have a native skill file format. Use the agent `description` and system prompt fields to encode skill behavior. For the brainstorming skill, define a `brainstorming` agent in `opencode.json` with mode `primary` and the brainstorming system prompt.
+opencode does not have a native skill file format. Generate each worker subagent's description and system prompt from `instructions/agents/README.md` and the matching `instructions/agents/<agent-name>.md` contract. Preserve canonical ownership, non-responsibilities, scope/write boundaries, procedure, evidence, verdicts, and handoff while applying opencode permissions and repository specialization. Do not independently rewrite role behavior in `opencode.json`.
+
+For the brainstorming skill, define a `brainstorming` agent in `opencode.json` with mode `primary` and the brainstorming system prompt.
 
 ---
 
@@ -147,5 +151,5 @@ Always include the task identifier, selected state backend, files to read, and e
 - Keep the routing block in `AGENTS.md` explicit so it applies regardless of which primary agent starts the session.
 - The `task-issues.json` file is created during brainstorming and lives at the project root.
 - Model provider keys (e.g., `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`) must be set in your environment before using the configured agents.
-- Follow `TEAM-ORCHESTRATION.md` as the canonical, harness-agnostic workflow; this file is only the opencode adapter for paths, formats, and native delegation.
+- Follow `TEAM-ORCHESTRATION.md` as the canonical, harness-agnostic workflow and `instructions/agents/*.md` as the canonical worker contracts; this file is only the opencode adapter for paths, formats, and native delegation.
 - Do not restate or override canonical state-backend, quality-gate, commit-gate, readiness, or issue-disposition rules here.
