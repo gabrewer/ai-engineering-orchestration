@@ -138,17 +138,60 @@ Keep `TEAM-ORCHESTRATION.md` focused on planning, execution, coordination, and q
 
 ### 9. Generate and validate the project team
 
-Show a compact map of the proposed front doors, workers, environment tailoring, model assignments, and permissions before generating native files.
+Do not generate native files immediately. First present a compact team map for human review containing:
 
-Generate the prompts, skills, and agent files required by the project. They should:
+| Area | Required detail |
+|---|---|
+| Front doors | `pm-agent` (planning) and `team-lead` (execution), including native entry points |
+| Workers | Each selected specialist, its mission, ownership boundary, inputs, outputs, and handoff |
+| Environment tailoring | Real repository paths, package/runtime versions, environments, and verification commands |
+| Models | Model assigned to each front door and worker, with the reason and fallback (if any) |
+| Permissions | Read/write/execute/network/tool access for each role, and why it is least privilege |
 
-- reference real project paths and commands;
-- follow existing repository conventions;
-- avoid assuming unapproved technologies;
-- preserve existing agent behavior where it remains valid; and
-- retain the canonical role mission, ownership, boundaries, evidence, and handoff.
+Use a prompt like this to generate the team:
 
-Validate discovery and generated resources without modifying application code. Confirm that commands resolve, tool entry points load, permissions are appropriate, and unrelated project behavior is unchanged.
+```text
+Generate the project team from `AGENT-GENERATION.md` and the selected
+`instructions/TOOL-*.md` adapter. Before creating or changing native files,
+show the compact team map requested by this workflow and stop for approval.
+
+After approval, generate only the prompts, skills, agent files, and tool
+configuration required by that map. For every generated resource:
+- cite the real repository paths it reads or changes;
+- use exact commands copied from repository configuration or verified by
+  discovery (do not invent commands, tools, frameworks, or services);
+- follow the repository's naming, placement, formatting, and instruction
+  conventions;
+- preserve existing prompts, skills, agents, and behavior unless a change is
+  required; describe each changed behavior and why;
+- preserve the canonical role mission, ownership, boundaries, evidence
+  requirements, quality gates, and handoff protocol from the shared contracts;
+- keep `pm-agent` as the planning front door and `team-lead` as the execution
+  front door; and
+- grant the narrowest permissions needed for the role. Do not expand authority
+  merely for convenience.
+
+Do not modify application code, tests, infrastructure, lockfiles, or unrelated
+configuration. If required context is missing or conflicts with an existing
+rule, stop and ask a focused question instead of guessing.
+```
+
+Validate discovery and generated resources without modifying application code.
+Record evidence for each check:
+
+- every referenced path exists or is explicitly marked as a planned new path;
+- every build, test, lint, format, migration, and verification command resolves
+  and is safe to run;
+- native tool entry points load and delegate to the intended front doors;
+- generated prompts, skills, and agents are syntactically valid and placed
+  according to repository conventions;
+- model assignments and permissions match the approved map and least-privilege
+  boundaries; and
+- the diff contains no application changes and unrelated project checks remain
+  unchanged.
+
+Report failures and unresolved assumptions; do not silently repair them by
+changing application code or broadening permissions.
 
 ### 10. Run planning-only mode
 

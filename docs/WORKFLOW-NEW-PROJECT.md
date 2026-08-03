@@ -127,19 +127,62 @@ Keep `TEAM-ORCHESTRATION.md` separate. It defines the planning, execution, coord
 
 ### 8. Generate and validate the project team
 
-Use `AGENT-GENERATION.md` and the relevant tool adapter (`TOOL-*.md`) to generate the project's native prompts, skills, agent files, model assignments, and tool permissions.
+Do not write native files until the proposed team is visible. Show a compact
+map for approval containing:
 
-Before writing them, show a compact map of the proposed:
+| Area | Required detail |
+|---|---|
+| Front doors | `pm-agent` (planning) and `team-lead` (execution), including native entry points |
+| Workers | Selected specialists, mission, ownership, inputs, outputs, and handoff |
+| Environment tailoring | Planned repository paths, approved stack, runtime/deployment environments, and commands |
+| Models | Model assigned to each role, rationale, and fallback (if any) |
+| Permissions | Read/write/execute/network/tool access for each role, with least-privilege rationale |
 
-- `pm-agent` and `team-lead` front doors;
-- specialist workers;
-- project/environment tailoring;
-- model assignments; and
-- permissions.
+Use a prompt like this to generate the team:
 
-Validate that generated agents reference real project paths and commands, align with approved technologies, and preserve the canonical worker contracts.
+```text
+Generate the project team from the PRD, repository context,
+`AGENT-GENERATION.md`, and the selected `instructions/TOOL-*.md` adapter.
+Before creating or changing native files, show the compact team map requested
+by this workflow and stop for approval.
 
-For a new project, a fuller default worker set may be appropriate because there is no legacy configuration to preserve. Omit roles that are clearly irrelevant.
+After approval, generate only the prompts, skills, agent files, and tool
+configuration required by that map. For every resource:
+- use real paths and commands already present in the repository, or clearly
+  label a path/command as planned for this new project;
+- use only technologies, services, models, and environments approved in the PRD
+  or explicitly approved by the owner; never fill gaps by guessing;
+- follow the repository's naming, placement, formatting, and instruction
+  conventions;
+- preserve the canonical role mission, ownership, boundaries, evidence,
+  quality gates, and handoff protocol from the shared contracts;
+- keep `pm-agent` as the planning front door and `team-lead` as the execution
+  front door; and
+- grant each role only the permissions required for its mission.
+
+Do not modify application code or create unapproved infrastructure. If the PRD,
+repository, or adapter is ambiguous or contradictory, stop and ask a focused
+question rather than inventing behavior.
+```
+
+For a new project, a fuller default worker set may be appropriate because there
+is no legacy configuration to preserve. Omit roles that are clearly irrelevant,
+and record why omitted roles are not needed.
+
+Validate without modifying application code. Record evidence that:
+
+- every planned path, command, and configuration target is either present or
+  explicitly identified as a generated project artifact;
+- generated prompts, skills, and agents are syntactically valid and use the
+  approved stack and repository conventions;
+- native tool entry points load and delegate to the intended front doors;
+- model assignments and permissions match the approved map and least-privilege
+  boundaries; and
+- the generated diff contains only approved orchestration/setup resources.
+
+Report missing prerequisites, unresolved assumptions, and validation failures;
+do not silently add technologies, broaden permissions, or alter application
+behavior to make validation pass.
 
 ### 9. Run planning mode
 
