@@ -142,9 +142,11 @@ Use a prompt like this to generate the team:
 
 ```text
 Generate the project team from the PRD, repository context,
-`AGENT-GENERATION.md`, and the selected `instructions/TOOL-*.md` adapter.
-Before creating or changing native files, show the compact team map requested
-by this workflow and stop for approval.
+`AGENT-GENERATION.md`, `instructions/TEAM-ORCHESTRATION.md`, and the selected
+`instructions/TOOL-*.md` adapter. Read the shared worker contracts in
+`instructions/agents/` before tailoring any role. Before creating or changing
+native files, show the compact team map requested by this workflow and stop for
+approval.
 
 After approval, generate only the prompts, skills, agent files, and tool
 configuration required by that map. For every resource:
@@ -155,7 +157,8 @@ configuration required by that map. For every resource:
 - follow the repository's naming, placement, formatting, and instruction
   conventions;
 - preserve the canonical role mission, ownership, boundaries, evidence,
-  quality gates, and handoff protocol from the shared contracts;
+  quality gates, and handoff protocol from
+  `instructions/TEAM-ORCHESTRATION.md` and `instructions/agents/`;
 - keep `pm-agent` as the planning front door and `team-lead` as the execution
   front door; and
 - grant each role only the permissions required for its mission.
@@ -173,8 +176,9 @@ Validate without modifying application code. Record evidence that:
 
 - every planned path, command, and configuration target is either present or
   explicitly identified as a generated project artifact;
-- generated prompts, skills, and agents are syntactically valid and use the
-  approved stack and repository conventions;
+- generated prompts, skills, and agents are syntactically valid, use the
+  approved stack and repository conventions, and preserve the routing and
+  authority rules in `instructions/TEAM-ORCHESTRATION.md`;
 - native tool entry points load and delegate to the intended front doors;
 - model assignments and permissions match the approved map and least-privilege
   boundaries; and

@@ -151,9 +151,12 @@ Do not generate native files immediately. First present a compact team map for h
 Use a prompt like this to generate the team:
 
 ```text
-Generate the project team from `AGENT-GENERATION.md` and the selected
-`instructions/TOOL-*.md` adapter. Before creating or changing native files,
-show the compact team map requested by this workflow and stop for approval.
+Generate the project team from `AGENT-GENERATION.md`,
+`instructions/TEAM-ORCHESTRATION.md`, and the selected
+`instructions/TOOL-*.md` adapter. Read the shared worker contracts in
+`instructions/agents/` before tailoring any role. Before creating or changing
+native files, show the compact team map requested by this workflow and stop for
+approval.
 
 After approval, generate only the prompts, skills, agent files, and tool
 configuration required by that map. For every generated resource:
@@ -165,7 +168,8 @@ configuration required by that map. For every generated resource:
 - preserve existing prompts, skills, agents, and behavior unless a change is
   required; describe each changed behavior and why;
 - preserve the canonical role mission, ownership, boundaries, evidence
-  requirements, quality gates, and handoff protocol from the shared contracts;
+  requirements, quality gates, and handoff protocol from
+  `instructions/TEAM-ORCHESTRATION.md` and `instructions/agents/`;
 - keep `pm-agent` as the planning front door and `team-lead` as the execution
   front door; and
 - grant the narrowest permissions needed for the role. Do not expand authority
@@ -183,8 +187,9 @@ Record evidence for each check:
 - every build, test, lint, format, migration, and verification command resolves
   and is safe to run;
 - native tool entry points load and delegate to the intended front doors;
-- generated prompts, skills, and agents are syntactically valid and placed
-  according to repository conventions;
+- generated prompts, skills, and agents are syntactically valid, placed
+  according to repository conventions, and preserve the routing and authority
+  rules in `instructions/TEAM-ORCHESTRATION.md`;
 - model assignments and permissions match the approved map and least-privilege
   boundaries; and
 - the diff contains no application changes and unrelated project checks remain
