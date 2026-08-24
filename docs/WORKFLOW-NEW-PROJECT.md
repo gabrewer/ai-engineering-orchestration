@@ -127,8 +127,7 @@ Keep `TEAM-ORCHESTRATION.md` separate. It defines the planning, execution, coord
 
 ### 8. Generate and validate the project team
 
-Do not write native files until the proposed team is visible. Show a compact
-map for approval containing:
+Before writing native files, show a compact map of the proposed team containing:
 
 | Area | Required detail |
 |---|---|
@@ -145,11 +144,9 @@ Generate the project team from the PRD, repository context,
 `AGENT-GENERATION.md`, `instructions/TEAM-ORCHESTRATION.md`, and the selected
 `instructions/TOOL-*.md` adapter. Read the shared worker contracts in
 `instructions/agents/` before tailoring any role. Before creating or changing
-native files, show the compact team map requested by this workflow and stop for
-approval.
-
-After approval, generate only the prompts, skills, agent files, and tool
-configuration required by that map. For every resource:
+native files, show the compact team map requested by this workflow. Incorporate
+available human feedback, then generate the prompts, skills, agent files, and
+tool configuration required by that map. For every resource:
 - use real paths and commands already present in the repository, or clearly
   label a path/command as planned for this new project;
 - use only technologies, services, models, and environments approved in the PRD
@@ -161,9 +158,9 @@ configuration required by that map. For every resource:
   `instructions/TEAM-ORCHESTRATION.md` and `instructions/agents/`;
 - keep `pm-agent` as the planning front door and `team-lead` as the execution
   front door; and
-- grant each role only the permissions required for its mission.
+- use permissions appropriate to its mission and project workflow.
 
-Do not modify application code or create unapproved infrastructure. If the PRD,
+Do not modify application code or unrelated project behavior. If the PRD,
 repository, or adapter is ambiguous or contradictory, stop and ask a focused
 question rather than inventing behavior.
 ```
