@@ -138,7 +138,7 @@ Keep `TEAM-ORCHESTRATION.md` focused on planning, execution, coordination, and q
 
 ### 9. Generate and validate the project team
 
-Do not generate native files immediately. First present a compact team map for human review containing:
+Before generating native files, present a compact team map containing:
 
 | Area | Required detail |
 |---|---|
@@ -154,12 +154,9 @@ Use a prompt like this to generate the team:
 Generate the project team from `AGENT-GENERATION.md`,
 `instructions/TEAM-ORCHESTRATION.md`, and the selected
 `instructions/TOOL-*.md` adapter. Read the shared worker contracts in
-`instructions/agents/` before tailoring any role. Before creating or changing
-native files, show the compact team map requested by this workflow and stop for
-approval.
-
-After approval, generate only the prompts, skills, agent files, and tool
-configuration required by that map. For every generated resource:
+`instructions/agents/` before tailoring any role. Before creating or changing native files, show the compact team map requested
+by this workflow. Incorporate available human feedback, then generate the
+prompts, skills, agent files, and tool configuration required by that map. For every generated resource:
 - cite the real repository paths it reads or changes;
 - use exact commands copied from repository configuration or verified by
   discovery (do not invent commands, tools, frameworks, or services);
@@ -172,11 +169,9 @@ configuration required by that map. For every generated resource:
   `instructions/TEAM-ORCHESTRATION.md` and `instructions/agents/`;
 - keep `pm-agent` as the planning front door and `team-lead` as the execution
   front door; and
-- grant the narrowest permissions needed for the role. Do not expand authority
-  merely for convenience.
+- use permissions appropriate to the role and project workflow.
 
-Do not modify application code, tests, infrastructure, lockfiles, or unrelated
-configuration. If required context is missing or conflicts with an existing
+Do not modify application code or unrelated project behavior. If required context is missing or conflicts with an existing
 rule, stop and ask a focused question instead of guessing.
 ```
 
