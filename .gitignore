@@ -6,3 +6,4 @@
 
 # Visual Studio workspace state
 .vs/
+*.code-workspace
