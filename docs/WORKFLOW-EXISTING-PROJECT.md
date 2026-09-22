@@ -179,8 +179,10 @@ Validate discovery and generated resources without modifying application code.
 Record evidence for each check:
 
 - every referenced path exists or is explicitly marked as a planned new path;
-- every build, test, lint, format, migration, and verification command resolves
-  and is safe to run;
+- every build, test, lint, format, migration, and verification command resolves;
+- commands that can mutate data, infrastructure, or deployments are not run during
+  setup without owner approval of the target environment; record a dry-run or
+  preflight check when available, or the prerequisites for human execution;
 - native tool entry points load and delegate to the intended front doors;
 - generated prompts, skills, and agents are syntactically valid, placed
   according to repository conventions, and preserve the routing and authority
