@@ -168,7 +168,7 @@ prompts, skills, agent files, and tool configuration required by that map. For e
   requirements, quality gates, and handoff protocol from
   `instructions/TEAM-ORCHESTRATION.md` and `instructions/agents/`;
 - keep `pm-agent` as the planning front door and `team-lead` as the execution
-- front door;
+  front door;
 - keep `pr-agent` separately invoked for pull-request lifecycle and cumulative review; it must not run automatically from `team-lead`; and
 - use permissions appropriate to the role and project workflow.
 
